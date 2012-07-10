@@ -90,6 +90,46 @@ typedef struct cairo_stroker {
     cairo_box_t bounds;
 } cairo_stroker_t;
 
+static cairo_bool_t
+_cairo_stroke_segment_intersect (cairo_point_t *p1, cairo_point_t *p2,
+                 cairo_point_t *p3, cairo_point_t *p4,
+                                 cairo_point_t *p)
+{
+    double x1, y1, x2, y2, x3, y3, x4, y4;
+    double pre, post;
+    double x, y, d;
+
+    x1 = _cairo_fixed_to_double (p1->x);
+    y1 = _cairo_fixed_to_double (p1->y);
+    x2 = _cairo_fixed_to_double (p2->x);
+    y2 = _cairo_fixed_to_double (p2->y);
+    x3 = _cairo_fixed_to_double (p3->x);
+    y3 = _cairo_fixed_to_double (p3->y);
+    x4 = _cairo_fixed_to_double (p4->x);
+    y4 = _cairo_fixed_to_double (p4->y);
+
+    d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (d == 0)
+        return FALSE;
+
+    pre = x1 * y2 - y1 * x2;
+    post = x3 * y4 - y3 * x4;
+    x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
+    y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
+
+    /* check if x, y are within both segments */
+    if (x < MIN (x1, x2) || x > MAX (x1, x2) ||
+        x < MIN (x3, x4) || x > MAX (x3, x4))
+    return FALSE;
+    if (y < MIN (y1, y2) || y > MAX (y1, y2) ||
+        y < MIN (y1, y2) || y > MAX (y3, y4))
+    return FALSE;
+
+    p->x = _cairo_fixed_from_double (x);
+    p->y = _cairo_fixed_from_double (y);
+    return TRUE;
+}
+
 static void
 _cairo_stroker_limit (cairo_stroker_t *stroker,
 		      const cairo_path_fixed_t *path,
@@ -1224,7 +1264,6 @@ _cairo_stroker_line_to_dashed (void *closure,
 
     return CAIRO_STATUS_SUCCESS;
 }
-
 static cairo_status_t
 _cairo_stroker_curve_to (void *closure,
 			 const cairo_point_t *b,
