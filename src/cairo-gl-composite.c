@@ -787,8 +787,11 @@ _cairo_gl_set_operands_and_operator (cairo_gl_composite_t *setup,
 
     vertex_size_changed = _cairo_gl_composite_setup_vbo (ctx, vertex_size);
 
-    _cairo_gl_context_setup_operand (ctx, CAIRO_GL_TEX_SOURCE, &setup->src, dst_size, vertex_size_changed);
-    _cairo_gl_context_setup_operand (ctx, CAIRO_GL_TEX_MASK, &setup->mask, dst_size + src_size, vertex_size_changed);
+    _cairo_gl_context_setup_operand (ctx, CAIRO_GL_TEX_SOURCE, &setup->src,
+				     dst_size, vertex_size_changed);
+    _cairo_gl_context_setup_operand (ctx, CAIRO_GL_TEX_MASK, &setup->mask,
+				     dst_size + src_size, vertex_size_changed);
+
 
     _cairo_gl_set_operator (ctx, setup->op, component_alpha);
 
