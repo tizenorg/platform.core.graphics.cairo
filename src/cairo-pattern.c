@@ -4683,6 +4683,9 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern)
     int i, x, y;
     double u, v;
     double sum = 0.0;
+    cairo_rectangle_int_t extents;
+    int width = CAIRO_MIN_SHRINK_SIZE;
+    int height = CAIRO_MIN_SHRINK_SIZE;
 
     if (pattern->status)
 	return pattern->status;
@@ -4696,6 +4699,11 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern)
     if (! pattern->convolution_changed)
         return CAIRO_STATUS_SUCCESS;
 
+    if (_cairo_surface_get_extents (((cairo_surface_pattern_t *)pattern)->surface, &extents)) {
+	width = extents.width;
+	height = extents.height;
+    }
+
     x_factor = 1;
     y_factor = 1;
     x_sigma = pattern->x_sigma;
@@ -4708,10 +4716,14 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern)
     if (x_sigma == 0.0)
         pattern->x_radius = 1;
     else {
-        while (x_sigma > CAIRO_MAX_SIGMA) {
+	while (x_sigma > CAIRO_MAX_SIGMA) {
+	    if (width < CAIRO_MIN_SHRINK_SIZE)
+		break;
+
 	    x_sigma /= 2.0;
  	    x_factor *= 2;
-        }
+	    width *= 0.5;
+	}
         /* XXX: skia uses 3, we follow css spec which is 2 */
 	pattern->x_radius = ceil (x_sigma * 2);
     }
@@ -4720,10 +4732,14 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern)
     if (y_sigma == 0.0)
         pattern->y_radius = 1;
     else {
-        while (y_sigma > CAIRO_MAX_SIGMA) {
+	while (y_sigma > CAIRO_MAX_SIGMA) {
+	    if (height < CAIRO_MIN_SHRINK_SIZE)
+		break;
+
 	    y_sigma *= 0.5;
- 	    y_factor *= 2;
-        }
+	    y_factor *= 2;
+	    height *= 0.5;
+	}
 	pattern->y_radius = ceil (y_sigma * 2);
     }
     pattern->shrink_factor_y = y_factor;
