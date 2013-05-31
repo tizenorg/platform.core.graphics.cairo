@@ -44,6 +44,18 @@
 #include "cairo-error-private.h"
 #include "cairo-output-stream-private.h"
 
+cairo_gl_uniform_t
+_cairo_gl_shader_uniform_for_texunit (cairo_gl_uniform_t uniform,
+				      cairo_gl_tex_t tex_unit)
+{
+    assert (uniform < CAIRO_GL_UNIFORM_MASK_TEXDIMS);
+    assert (tex_unit == CAIRO_GL_TEX_SOURCE || tex_unit == CAIRO_GL_TEX_MASK);
+    if (tex_unit == CAIRO_GL_TEX_SOURCE)
+	return uniform;
+    else
+	return uniform + CAIRO_GL_UNIFORM_MASK_TEXDIMS;
+}
+
 static cairo_status_t
 _cairo_gl_shader_compile_and_link (cairo_gl_context_t *ctx,
 				   cairo_gl_shader_t *shader,
@@ -255,6 +267,8 @@ cairo_gl_operand_get_var_type (cairo_gl_operand_t *operand)
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT:
         return operand->gradient.texgen ? CAIRO_GL_VAR_TEXGEN : CAIRO_GL_VAR_TEXCOORDS;
     case CAIRO_GL_OPERAND_TEXTURE:
+    case CAIRO_GL_OPERAND_X_GAUSSIAN:
+    case CAIRO_GL_OPERAND_Y_GAUSSIAN:
         return operand->texture.texgen ? CAIRO_GL_VAR_TEXGEN : CAIRO_GL_VAR_TEXCOORDS;
     }
 }
@@ -412,6 +426,8 @@ _cairo_gl_shader_needs_border_fade (cairo_gl_operand_t *operand)
 
     return extend == CAIRO_EXTEND_NONE &&
 	   (operand->type == CAIRO_GL_OPERAND_TEXTURE ||
+	    operand->type == CAIRO_GL_OPERAND_X_GAUSSIAN ||
+	    operand->type == CAIRO_GL_OPERAND_Y_GAUSSIAN ||
 	    operand->type == CAIRO_GL_OPERAND_LINEAR_GRADIENT ||
 	    operand->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE ||
 	    operand->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0);
@@ -460,30 +476,42 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	}
 	    break;
     case CAIRO_GL_OPERAND_TEXTURE:
+    case CAIRO_GL_OPERAND_X_GAUSSIAN:
+    case CAIRO_GL_OPERAND_Y_GAUSSIAN:
 	if (! use_atlas) {
 	    _cairo_output_stream_printf (stream,
 		"uniform sampler2D%s %s_sampler;\n"
 		"uniform vec2 %s_texdims;\n"
-		"varying vec2 %s_texcoords;\n"
-		"vec4 get_%s()\n"
-		"{\n",
-		rectstr, namestr, namestr, namestr, namestr);
+		"varying vec2 %s_texcoords;\n",
+		rectstr, namestr, namestr, namestr);
 	} else {
 	    _cairo_output_stream_printf (stream,
 		"uniform sampler2D%s %s_sampler;\n"
 		"uniform vec2 %s_texdims;\n"
 		"varying vec2 %s_texcoords;\n"
 		"varying vec2 %s_start_coords;\n"
-		"varying vec2 %s_stop_coords;\n"
-		"vec4 get_%s()\n"
-		"{\n",
-		rectstr, namestr, namestr, namestr, namestr, namestr, namestr);
+		"varying vec2 %s_stop_coords;\n",
+		rectstr, namestr, namestr, namestr, namestr, namestr);
 	}
 
-	if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
+	if (op->type != CAIRO_GL_OPERAND_TEXTURE) {
+	    _cairo_output_stream_printf (stream,
+		"uniform int %s_blur_radius;\n"
+		"uniform float %s_blur_step;\n"
+		"uniform float %s_blurs[17];\n",
+		namestr, namestr, namestr);
+	}
+
+	_cairo_output_stream_printf (stream,
+	    "vec4 get_%s()\n"
+	    "{\n",
+	    namestr);
+
+	if (op->type == CAIRO_GL_OPERAND_TEXTURE) {
+	    if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
 		 ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
-	     _cairo_gl_shader_needs_border_fade (op))
-	{
+	        _cairo_gl_shader_needs_border_fade (op))
+	    {
 		if (! use_atlas) {
 		    _cairo_output_stream_printf (stream,
 			"    vec2 border_fade = %s_border_fade (%s_texcoords, %s_texdims);\n"
@@ -498,25 +526,135 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 			"    vec2 co = %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords);\n"
 			"    if (co.x == -1.0 && co.y == -1.0)\n"
 		        "        return vec4(0.0, 0.0, 0.0, 0.0);\n"
-			"    vec4 texel = texture2D%s (%s_sampler, co);\n"
+			"    vec4 texel = texture2D%s (%s_sampler, %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords));\n"
 			"    return texel * border_fade.x * border_fade.y;\n"
 			"}\n",
-			namestr, namestr, namestr, namestr,
-			namestr, namestr, namestr, rectstr, namestr);
+			namestr, namestr, namestr, namestr, namestr, namestr, namestr, rectstr, namestr, namestr, namestr, namestr, namestr);
 		}
+	    }
+	    else
+	    {
+		if (! use_atlas) {
+		    _cairo_output_stream_printf (stream,
+			"    return texture2D%s (%s_sampler, %s_wrap (%s_texcoords));\n"
+			"}\n",
+			rectstr, namestr, namestr, namestr);
+		} else {
+		    _cairo_output_stream_printf (stream,
+			"    return texture2D%s (%s_sampler, %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords));\n"
+			"}\n",
+			rectstr, namestr, namestr, namestr, namestr, namestr);
+		}
+	    }
 	}
-	else
-	{
-	    if (! use_atlas) {
+	else if (op->type == CAIRO_GL_OPERAND_X_GAUSSIAN) {
+	    if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
+		 ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
+	        _cairo_gl_shader_needs_border_fade (op))
+	    {
+		/* always uses atlas */
 		_cairo_output_stream_printf (stream,
-		    "    return texture2D%s (%s_sampler, %s_wrap (%s_texcoords));\n"
+		    "    int i;\n"
+		    "    vec2 texcoords;\n"
+		    "    vec2 border_fade;\n"
+		    "    vec4 texel = vec4 (0.0, 0.0, 0.0, 0.0);\n"
+		    "    vec2 wrapped_coords = %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "    if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "        return texel;\n"
+		    "    for (i = -%s_blur_radius; i <= %s_blur_radius; i++) {\n"
+		    "        texcoords = %s_texcoords + vec2 (%s_blur_step * i, 0.0);\n"
+		    "        border_fade = %s_border_fade (texcoords, %s_texdims);\n"
+		    "        wrapped_coords = %s_wrap (texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "        if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "            texel += vec4 (0.0, 0.0, 0.0, 1.0) * %s_blurs[i+%s_blur_radius] * border_fade.x * border_fade.y;\n"
+		    "        else\n"
+		    "            texel += texture2D%s (%s_sampler, wrapped_coords) * %s_blurs[i+%s_blur_radius] * border_fade.x * border_fade.y;\n"
+		    "    }\n"
+		    "    return texel;\n"
 		    "}\n",
+		    namestr, namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
 		    rectstr, namestr, namestr, namestr);
-	    } else {
+	    }
+	    else
+	    {
 		_cairo_output_stream_printf (stream,
-		    "    return texture2D%s (%s_sampler, %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords));\n"
+		    "    int i;\n"
+		    "    vec2 texcoords;\n"
+		    "    vec4 texel = vec4 (0.0, 0.0, 0.0, 0.0);\n"
+		    "    vec2 wrapped_coords = %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "    if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "        return texel;\n"
+		    "    for (i = -%s_blur_radius; i <= %s_blur_radius; i++) {\n"
+		    "        texcoords = %s_texcoords + vec2 (%s_blur_step * i, 0.0);\n"
+		    "        wrapped_coords = %s_wrap (texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "        if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "            texel += vec4 (0.0, 0.0, 0.0, 1.0) * %s_blurs[i+%s_blur_radius];\n"
+		    "        else\n"
+		    "            texel += texture2D%s (%s_sampler, wrapped_coords) * %s_blurs[i+%s_blur_radius];\n"
+		    "    }\n"
+		    "    return texel;\n"
 		    "}\n",
-		    rectstr, namestr, namestr, namestr, namestr, namestr);
+		    namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
+		    rectstr, namestr, namestr, namestr);
+	    }
+	}
+	else {
+	    if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
+		 ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
+	        _cairo_gl_shader_needs_border_fade (op))
+	    {
+		/* always uses atlas */
+		_cairo_output_stream_printf (stream,
+		    "    int i;\n"
+		    "    vec2 texcoords;\n"
+		    "    vec2 border_fade;\n"
+		    "    vec4 texel = vec4 (0.0, 0.0, 0.0, 0.0);\n"
+		    "    vec2 wrapped_coords = %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "    if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "        return texel;\n"
+		    "    for (i = -%s_blur_radius; i <= %s_blur_radius; i++) {\n"
+		    "        texcoords = %s_texcoords + vec2 (0.0, %s_blur_step * i);\n"
+		    "        border_fade = %s_border_fade (texcoords, %s_texdims);\n"
+		    "        wrapped_coords = %s_wrap (texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "        if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "            texel += vec4 (0.0, 0.0, 0.0, 1.0) * %s_blurs[i+%s_blur_radius] * border_fade.x * border_fade.y;\n"
+		    "        else\n"
+		    "            texel += texture2D%s (%s_sampler, wrapped_coords) * %s_blurs[i+%s_blur_radius] * border_fade.x * border_fade.y;\n"
+		    "    }\n"
+		    "    return texel;\n"
+		    "}\n",
+		    namestr, namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
+		    rectstr, namestr, namestr, namestr);
+	    }
+	    else
+	    {
+		_cairo_output_stream_printf (stream,
+		    "    int i;\n"
+		    "    vec2 texcoords;\n"
+		    "    vec4 texel = vec4 (0.0, 0.0, 0.0, 0.0);\n"
+		    "    vec2 wrapped_coords = %s_wrap (%s_texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "    if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "        return texel;\n"
+		    "    for (i = -%s_blur_radius; i <= %s_blur_radius; i++) {\n"
+		    "        texcoords = %s_texcoords + vec2 (0.0, %s_blur_step * i);\n"
+		    "        wrapped_coords = %s_wrap (texcoords, %s_start_coords, %s_stop_coords);\n"
+		    "        if (wrapped_coords == vec2 (-1.0, -1.0))\n"
+		    "            texel += vec4 (0.0, 0.0, 0.0, 1.0) * %s_blurs[i+%s_blur_radius];\n"
+		    "        else\n"
+		    "            texel += texture2D%s (%s_sampler, wrapped_coords) * %s_blurs[i+%s_blur_radius];\n"
+		    "    }\n"
+		    "    return texel;\n"
+		    "}\n",
+		    namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr,
+		    namestr, namestr, namestr, namestr, namestr,
+		    rectstr, namestr, namestr, namestr);
 	    }
 	}
         break;
@@ -783,9 +921,11 @@ _cairo_gl_shader_emit_wrap (cairo_gl_context_t *ctx,
 	else {
 	    _cairo_output_stream_printf (stream,
 		"    if (any (lessThan (coords, start_coords)))\n"
-		"        return vec2 (-1.0);\n"
+		//"        return vec2 (coords - start_coords);\n"
+		"          return vec2 (-1.0);\n"
 		"    if (any (greaterThan (coords, stop_coords)))\n"
-		"        return vec2 (-1.0);\n"
+		//"        return vec2 (coords - stop_coords + vec2 (1.0, 1.0));\n"
+		"          return vec2 (-1.0);\n"
 		"    else\n"
 		"        return coords;\n");
 	}
@@ -1029,6 +1169,8 @@ _cairo_gl_shader_compile_and_link (cairo_gl_context_t *ctx,
 	if (unlikely (status))
 	    goto FAILURE;
 
+	printf ("\n\n======= vertex source ========\n%s\n\n", source);
+
 	compile_shader (ctx, &ctx->vertex_shaders[vertex_shader],
 			GL_VERTEX_SHADER, source);
 	free (source);
@@ -1058,6 +1200,12 @@ _cairo_gl_shader_compile_and_link (cairo_gl_context_t *ctx,
 	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "texdims");
 	shader->texgen_location[i] =
 	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "texgen");
+	shader->blur_radius_location[i] =
+	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "blur_radius");
+	shader->blurs_location[i] =
+	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "blurs");
+	shader->blur_step_location[i] =
+	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "blur_step");
     }
 
     return CAIRO_STATUS_SUCCESS;
@@ -1110,6 +1258,26 @@ _cairo_gl_shader_bind_float (cairo_gl_context_t *ctx,
     cairo_gl_dispatch_t *dispatch = &ctx->dispatch;
     assert (location != -1);
     dispatch->Uniform1f (location, value);
+}
+
+void
+_cairo_gl_shader_bind_int (cairo_gl_context_t *ctx,
+			    GLint location,
+			     int value)
+{
+    cairo_gl_dispatch_t *dispatch = &ctx->dispatch;
+    assert (location != -1);
+    dispatch->Uniform1i (location, value);
+}
+
+void
+_cairo_gl_shader_bind_float_array (cairo_gl_context_t *ctx,
+				   GLint location,
+				   int num, float *values)
+{
+    cairo_gl_dispatch_t *dispatch = &ctx->dispatch;
+    assert (location != -1);
+    dispatch->Uniform1fv (location, num, values);
 }
 
 void
@@ -1240,6 +1408,8 @@ _cairo_gl_get_shader_by_type (cairo_gl_context_t *ctx,
 						  &fs_source);
     if (unlikely (status))
 	return status;
+
+    printf ("\n\n======= fragment source ========\n%s\n\n", fs_source);
 
     entry = malloc (sizeof (cairo_shader_cache_entry_t));
     if (unlikely (entry == NULL)) {
