@@ -400,6 +400,7 @@ _cairo_gl_surface_init (cairo_device_t *device,
 
     surface->image_content_scale_x = 1.0;
     surface->image_content_scale_y = 1.0;
+    surface->blur_stage = CAIRO_GL_BLUR_STAGE_NONE;
 
     surface->clip_on_stencil_buffer = NULL;
 
