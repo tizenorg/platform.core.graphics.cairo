@@ -119,6 +119,7 @@
 #define IMAGE_CACHE_MIN_SIZE 1
 #define IMAGE_CACHE_MAX_SIZE 256
 #define MIN_SCRATCH_SIZE 32
+#define MAX_SCRATCH_SIZE 256
 
 typedef struct _cairo_gl_surface cairo_gl_surface_t;
 typedef struct _cairo_gl_image   cairo_gl_image_t;
@@ -159,6 +160,8 @@ typedef enum cairo_gl_uniform_t {
     CAIRO_GL_UNIFORM_BLUR_RADIUS,/* "source_blur_radius" */
     CAIRO_GL_UNIFORM_BLURS,	 /* "source_blurs" */
     CAIRO_GL_UNIFORM_BLUR_STEP,	 /* "source_blurstep" */
+    CAIRO_GL_UNIFORM_BLUR_X_AXIS, /* "source_blur_x_axis" */
+    CAIRO_GL_UNIFORM_BLUR_Y_AXIS, /* "source_blur_y_axis" */
 
     CAIRO_GL_UNIFORM_MASK_TEXDIMS,      /* "mask_texdims" */
     CAIRO_GL_UNIFORM_MASK_TEXGEN,       /* "mask_texgen" */
@@ -170,6 +173,8 @@ typedef enum cairo_gl_uniform_t {
     CAIRO_GL_UNIFORM_MASK_BLUR_RADIUS,  /* "mask_blur_radius */
     CAIRO_GL_UNIFORM_MASK_BLURS,	/* "mask_blurs */
     CAIRO_GL_UNIFORM_MASK_BLUR_STEP,	/* "mask_blur_step" */
+    CAIRO_GL_UNIFORM_MASK_BLUR_X_AXIS,   /* "mask_blur_x_axis" */
+    CAIRO_GL_UNIFORM_MASK_BLUR_Y_AXIS,   /* "mask_blur_y_axis" */
 
     CAIRO_GL_UNIFORM_PROJECTION_MATRIX, /* "ModelViewProjectionMatrix" */
 
@@ -198,8 +203,7 @@ typedef enum cairo_gl_operand_type {
     CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0,
     CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE,
     CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT,
-    CAIRO_GL_OPERAND_X_GAUSSIAN,
-    CAIRO_GL_OPERAND_Y_GAUSSIAN,
+    CAIRO_GL_OPERAND_GAUSSIAN,
 
     CAIRO_GL_OPERAND_COUNT
 } cairo_gl_operand_type_t;
@@ -215,6 +219,7 @@ typedef enum cairo_gl_draw_mode {
  */
 typedef struct cairo_gl_operand {
     cairo_gl_operand_type_t type;
+    int pass; /* 0 none, 1, x-axis, 2, y-axis */
     union {
 	struct {
 	    GLuint tex;
@@ -319,6 +324,8 @@ typedef struct cairo_gl_shader {
     GLint blur_radius_location[2];
     GLint blurs_location[2];
     GLint blur_step_location[2];
+    GLint blur_x_axis_location[2];
+    GLint blur_y_axis_location[2];
 } cairo_gl_shader_t;
 
 typedef struct _cairo_gl_image_cache {
@@ -612,7 +619,7 @@ struct _cairo_gl_context {
     /* Intermediate mask surface for glyph rendering. Created on first access, enlarged on demand. */
     cairo_gl_surface_t *glyph_mask;
     /* Intermediate blur surface for gaussian blur. Created on first access, enlarged on demand. */
-    cairo_gl_surface_t *scratch_surfaces[2];
+    cairo_gl_surface_t *scratch_surfaces[4];
     cairo_gl_multisample_ext_type msaa_type;
 
     void (*acquire) (void *ctx);
