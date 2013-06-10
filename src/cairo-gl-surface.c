@@ -397,6 +397,8 @@ _cairo_gl_surface_init (cairo_device_t *device,
     surface->needs_to_cache = FALSE;
     surface->image_node = NULL;
 
+    surface->clip_on_stencil_buffer = NULL;
+
     _cairo_gl_surface_embedded_operand_init (surface);
 }
 
@@ -1077,6 +1079,7 @@ _cairo_gl_surface_finish (void *abstract_surface)
 	_cairo_rtree_node_remove (&ctx->image_cache->rtree,
 				  &surface->image_node->node);
     }
+
     if (surface->clip_on_stencil_buffer)
         _cairo_clip_destroy (surface->clip_on_stencil_buffer);
 
