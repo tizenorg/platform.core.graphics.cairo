@@ -622,7 +622,7 @@ struct _cairo_gl_context {
     cairo_gl_multisample_ext_type msaa_type;
     cairo_gl_surface_t *source_scratch_surfaces[2];
     cairo_gl_surface_t *mask_scratch_surfaces[2];
-    cairo_gl_surface_t *shadow_scratch_surfaces[2];
+    cairo_gl_surface_t *shadow_scratch_surfaces[3];
     cairo_bool_t source_scratch_in_use;
 
     void (*acquire) (void *ctx);
