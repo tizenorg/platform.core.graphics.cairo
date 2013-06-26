@@ -609,7 +609,8 @@ _cairo_gl_composite_setup_vbo (cairo_gl_context_t *ctx,
 static cairo_int_status_t
 _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
 					    cairo_gl_context_t *ctx,
-					    int vertex_size)
+					    int vertex_size,
+					    cairo_bool_t clip_is_equal)
 {
     cairo_int_status_t status = CAIRO_INT_STATUS_SUCCESS;
 
@@ -642,7 +643,7 @@ _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
      * scissor around the painted clip. */
     _cairo_gl_scissor_to_rectangle (dst, _cairo_clip_get_extents (clip));
 
-    if (_cairo_clip_equal (old_clip, setup->clip))
+    if (clip_is_equal)
         goto activate_stencil_buffer_and_return;
 
 	if (old_clip) {
@@ -687,6 +688,12 @@ _cairo_gl_composite_setup_clipping (cairo_gl_composite_t *setup,
 				    int vertex_size)
 {
     cairo_bool_t clip_region_changing = TRUE;
+    cairo_bool_t clip_is_equal = TRUE;
+
+    if (! _cairo_clip_equal (setup->dst->clip_on_stencil_buffer, setup->clip)) {
+	_cairo_gl_composite_flush (ctx);
+	clip_is_equal = FALSE;
+    }
 
     if (! setup->clip && ! setup->clip_region && ! ctx->clip_region)
 	goto disable_all_clipping;
@@ -712,7 +719,8 @@ _cairo_gl_composite_setup_clipping (cairo_gl_composite_t *setup,
 
     if (setup->clip)
 	return _cairo_gl_composite_setup_painted_clipping (setup, ctx,
-                                                           vertex_size);
+                                                           vertex_size,
+							   clip_is_equal);
 disable_all_clipping:
     _disable_stencil_buffer (ctx);
     _disable_scissor_buffer (ctx);
