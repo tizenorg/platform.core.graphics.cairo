@@ -471,7 +471,6 @@ _get_depth_stencil_format (cairo_gl_context_t *ctx)
 #endif
 }
 
-#if 0
 static void
 _cairo_gl_clear_framebuffer (cairo_gl_context_t *ctx,
 			     cairo_gl_surface_t *surface)
@@ -485,7 +484,6 @@ _cairo_gl_clear_framebuffer (cairo_gl_context_t *ctx,
 	ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     }
 }
-#endif
 
 #if CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_EVASGL_SURFACE
 static void
@@ -920,6 +918,7 @@ _cairo_gl_context_bind_framebuffer (cairo_gl_context_t *ctx,
 	if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2) {
 	    _cairo_gl_ensure_framebuffer (ctx, surface);
 	    ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->fb);
+	    _cairo_gl_clear_framebuffer (ctx, surface);
 	    return;
 	}
 
@@ -969,7 +968,6 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
 
     if (! changing_surface && ! changing_sampling)
 	return;
-
     if (! changing_surface) {
 	_cairo_gl_composite_flush (ctx);
 	_cairo_gl_context_bind_framebuffer (ctx, surface, multisampling);
