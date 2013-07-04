@@ -741,7 +741,9 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
     ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->fb);
     ctx->dispatch.BlitFramebuffer (0, 0, surface->width, surface->height,
 				   0, 0, surface->width, surface->height,
-				   GL_COLOR_BUFFER_BIT, GL_NEAREST);
+				   GL_COLOR_BUFFER_BIT |
+				   GL_STENCIL_BUFFER_BIT |
+				   GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->msaa_fb);
 
     if (stencil_test_enabled)
@@ -784,7 +786,9 @@ bind_singlesample_framebuffer (cairo_gl_context_t *ctx,
     ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->msaa_fb);
     ctx->dispatch.BlitFramebuffer (0, 0, surface->width, surface->height,
 				   0, 0, surface->width, surface->height,
-				   GL_COLOR_BUFFER_BIT, GL_NEAREST);
+				   GL_COLOR_BUFFER_BIT |
+				   GL_STENCIL_BUFFER_BIT |
+				   GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->fb);
 
     if (stencil_test_enabled)
