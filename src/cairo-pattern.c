@@ -4726,7 +4726,7 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern,
         pattern->x_radius = 0;
     else {
 	while (x_sigma > max_sigma && test_line_width > min_line_width) {
-	    if (width < CAIRO_MIN_SHRINK_SIZE)
+	    if (width <= CAIRO_MIN_SHRINK_SIZE)
 		break;
 
 	    x_sigma /= 2.0;
@@ -4746,7 +4746,7 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern,
         pattern->y_radius = 0;
     else {
 	while (y_sigma > max_sigma && test_line_width > min_line_width) {
-	    if (height < CAIRO_MIN_SHRINK_SIZE)
+	    if (height <= CAIRO_MIN_SHRINK_SIZE)
 		break;
 
 	    y_sigma *= 0.5;
@@ -4764,6 +4764,7 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern,
 	free (pattern->convolution_matrix);
 
     pattern->convolution_matrix = NULL;
+
     /* 2D gaussian
      * f(x, y) = exp (-((x-x0)^2/(2*x_sigma^2)+(y-y0)^2/(2*y_sigma*2)))
      */
