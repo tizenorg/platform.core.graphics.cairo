@@ -1194,7 +1194,6 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
         ASSERT_NOT_REACHED;
     case CAIRO_GL_OPERAND_NONE:
 	return;
-
     case CAIRO_GL_OPERAND_CONSTANT:
 	if (operand->constant.encode_as_attribute)
 	    return;
