@@ -975,8 +975,7 @@ _cairo_xcb_surface_paint (void			*abstract_surface,
     status = _cairo_surface_shadow_paint (surface, op, source, clip,
 					  &source->shadow);
     if (unlikely (status) ||
-	source->shadow.draw_shadow_only ||
-	shadow_type == CAIRO_SHADOW_INSET) {
+	source->shadow.draw_shadow_only) {
 	cairo_device_release (surface->device);
 	return status;
     }
@@ -1005,8 +1004,7 @@ _cairo_xcb_surface_mask (void			*abstract_surface,
     status = _cairo_surface_shadow_mask (surface, op, source, mask, clip,
 					  &source->shadow);
     if (unlikely (status) ||
-	source->shadow.draw_shadow_only ||
-	shadow_type == CAIRO_SHADOW_INSET) {
+	source->shadow.draw_shadow_only) {
 	cairo_device_release (surface->device);
 	return status;
     }
@@ -1037,20 +1035,38 @@ _cairo_xcb_surface_stroke (void				*abstract_surface,
     if (unlikely (status))
 	return status;
 
-    status = _cairo_surface_shadow_stroke (surface, op, source, path,
-					   style, ctm, ctm_inverse,
-					   tolerance, antialias, clip,
-					   &source->shadow);
-    if (unlikely (status) ||
-	source->shadow.draw_shadow_only ||
-	shadow_type == CAIRO_SHADOW_INSET) {
+    if (shadow_type != CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_stroke (surface, op, source, path,
+					       style, ctm, ctm_inverse,
+					       tolerance, antialias, clip,
+					       &source->shadow);
+
+    if (unlikely (status)) {
 	cairo_device_release (surface->device);
 	return status;
     }
 
-    status = _cairo_compositor_stroke (compositor, surface, op, source,
-				       path, style, ctm, ctm_inverse,
-				       tolerance, antialias, clip);
+    if (shadow_type == CAIRO_SHADOW_DROP &&
+	source->shadow.draw_shadow_only) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (! source->shadow.draw_shadow_only)
+	status = _cairo_compositor_stroke (compositor, surface, op, source,
+					   path, style, ctm, ctm_inverse,
+					   tolerance, antialias, clip);
+
+    if (unlikely (status)) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (shadow_type == CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_stroke (surface, op, source, path,
+					       style, ctm, ctm_inverse,
+					       tolerance, antialias, clip,
+					       &source->shadow);
     cairo_device_release (surface->device);
     return status;
 }
@@ -1074,20 +1090,38 @@ _cairo_xcb_surface_fill (void			*abstract_surface,
     if (unlikely (status))
 	return status;
 
-    status = _cairo_surface_shadow_fill (surface, op, source, path,
-					 fill_rule, tolerance,
-					 antialias, clip,
-					 &source->shadow);
-    if (unlikely (status) ||
-	source->shadow.draw_shadow_only ||
-	shadow_type == CAIRO_SHADOW_INSET) {
+    if (shadow_type != CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_fill (surface, op, source, path,
+					     fill_rule, tolerance,
+					     antialias, clip,
+					     &source->shadow);
+    if (unlikely (status)) {
 	cairo_device_release (surface->device);
 	return status;
     }
 
-    status = _cairo_compositor_fill (compositor, surface, op,
-				     source, path, fill_rule,
-				     tolerance, antialias, clip);
+    if (shadow_type == CAIRO_SHADOW_DROP &&
+	source->shadow.draw_shadow_only) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (! source->shadow.draw_shadow_only)
+	status = _cairo_compositor_fill (compositor, surface, op,
+					 source, path, fill_rule,
+					 tolerance, antialias, clip);
+
+    if (unlikely (status)) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (shadow_type == CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_fill (surface, op, source, path,
+					     fill_rule, tolerance,
+					     antialias, clip,
+					     &source->shadow);
+
     cairo_device_release (surface->device);
     return status;
 }
@@ -1110,21 +1144,39 @@ _cairo_xcb_surface_glyphs (void				*abstract_surface,
     if (unlikely (status))
 	return status;
 
-    status = _cairo_surface_shadow_glyphs (surface, op, source,
-					   scaled_font, 
-					   glyphs, num_glyphs, 
-					   clip,
-					   &source->shadow);
-    if (unlikely (status) ||
-	source->shadow.draw_shadow_only ||
-	shadow_type == CAIRO_SHADOW_INSET) {
+    if (shadow_type != CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_glyphs (surface, op, source,
+					       scaled_font, 
+					       glyphs, num_glyphs, 
+					       clip,
+					       &source->shadow);
+    if (unlikely (status)) {
 	cairo_device_release (surface->device);
 	return status;
     }
 
-    status = _cairo_compositor_glyphs (compositor, surface, op,
-				       source, glyphs, num_glyphs,
-				       scaled_font, clip);
+    if (shadow_type == CAIRO_SHADOW_DROP &&
+	source->shadow.draw_shadow_only) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (! source->shadow.draw_shadow_only)
+	status = _cairo_compositor_glyphs (compositor, surface, op,
+					   source, glyphs, num_glyphs,
+					   scaled_font, clip);
+
+    if (unlikely (status)) {
+	cairo_device_release (surface->device);
+	return status;
+    }
+
+    if (shadow_type == CAIRO_SHADOW_INSET)
+	status = _cairo_surface_shadow_glyphs (surface, op, source,
+					       scaled_font, 
+					       glyphs, num_glyphs, 
+					       clip,
+					       &source->shadow);
     cairo_device_release (surface->device);
     return status;
 }
