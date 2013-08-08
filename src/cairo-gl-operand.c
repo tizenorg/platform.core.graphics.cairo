@@ -1302,7 +1302,7 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	_cairo_gl_shader_bind_float_array (ctx,
                                     ctx->current_shader->blurs_location[tex_unit],
 				    operand->texture.y_radius * 2 + 1,
-				    operand->texture.coef);
+				    &operand->texture.coef[0]);
     }
 
     if (operand->type == CAIRO_GL_OPERAND_TEXTURE ||
