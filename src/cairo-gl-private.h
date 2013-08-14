@@ -1237,6 +1237,7 @@ cairo_private cairo_int_status_t
 _cairo_draw_int_rect (cairo_gl_context_t	*ctx,
 		      cairo_gl_composite_t	*setup,
 		      cairo_rectangle_int_t	*rect);
+
 cairo_private cairo_gl_surface_t *
 _cairo_gl_gaussian_filter (cairo_gl_surface_t *dst,
 			   const cairo_surface_pattern_t *pattern,

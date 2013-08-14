@@ -132,13 +132,13 @@ void
 _cairo_gl_composite_set_source_operand (cairo_gl_composite_t *setup,
 					const cairo_gl_operand_t *source)
 {
-    //cairo_int_status_t status;
+    cairo_int_status_t status;
 
     _cairo_gl_operand_destroy (&setup->src);
     _cairo_gl_operand_copy (&setup->src, source);
-    /*if (source->type == CAIRO_GL_OPERAND_TEXTURE ||
+    if (source->type == CAIRO_GL_OPERAND_TEXTURE ||
 	source->type == CAIRO_GL_OPERAND_GAUSSIAN)
-	status = _cairo_gl_surface_resolve_multisampling (source->texture.surface);	*/
+	status = _cairo_gl_surface_resolve_multisampling (source->texture.surface);	
 }
 
 void
@@ -168,13 +168,13 @@ void
 _cairo_gl_composite_set_mask_operand (cairo_gl_composite_t *setup,
 				      const cairo_gl_operand_t *mask)
 {
-    //cairo_int_status_t status;
+    cairo_int_status_t status;
     _cairo_gl_operand_destroy (&setup->mask);
     if (mask) {
 	_cairo_gl_operand_copy (&setup->mask, mask);
-	/*if (mask->type == CAIRO_GL_OPERAND_TEXTURE ||
+	if (mask->type == CAIRO_GL_OPERAND_TEXTURE ||
 	    mask->type == CAIRO_GL_OPERAND_GAUSSIAN)
-	    status = _cairo_gl_surface_resolve_multisampling (mask->texture.surface);	*/
+	    status = _cairo_gl_surface_resolve_multisampling (mask->texture.surface);	
     }
 }
 
