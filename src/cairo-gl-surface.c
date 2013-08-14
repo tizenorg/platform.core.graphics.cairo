@@ -399,6 +399,8 @@ _cairo_gl_surface_init (cairo_device_t *device,
 
     surface->clip_on_stencil_buffer = NULL;
 
+    surface->content_in_texture = FALSE;
+
     _cairo_gl_surface_embedded_operand_init (surface);
 }
 
@@ -436,6 +438,7 @@ _cairo_gl_surface_create_scratch_for_texture (cairo_gl_context_t   *ctx,
     _cairo_gl_surface_init (&ctx->base, surface, content, width, height);
 
     surface->supports_msaa = ctx->supports_msaa;
+    surface->num_samples = ctx->num_samples;
     surface->supports_stencil = TRUE;
 
     /* Create the texture used to store the surface's data. */
@@ -900,7 +903,8 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
     if (unlikely (status))
 	return status;
 
-    if (_cairo_gl_get_flavor () == CAIRO_GL_FLAVOR_ES) {
+    if (_cairo_gl_get_flavor () == CAIRO_GL_FLAVOR_ES2 ||
+	_cairo_gl_get_flavor () == CAIRO_GL_FLAVOR_ES3) {
 	pixman_format_code_t pixman_format;
 	cairo_surface_pattern_t pattern;
 	cairo_bool_t require_conversion = FALSE;
@@ -989,7 +993,7 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	 *     alignment constraint
 	 */
 	if (src->stride < 0 ||
-	    (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES &&
+	    (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
 	     (src->width * cpp < src->stride - 3 ||
 	      width != src->width)))
 	{
@@ -1005,9 +1009,16 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	else
 	{
 	    glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
-	    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+	    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
+		ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
 		glPixelStorei (GL_UNPACK_ROW_LENGTH, src->stride / cpp);
 	}
+
+	/* we must resolve the renderbuffer to texture before we
+	   upload image */
+	status = _cairo_gl_surface_resolve_multisampling (dst);
+	if (unlikely (status))
+	    goto FAIL;
 
         _cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
 	glBindTexture (ctx->tex_target, dst->tex);
@@ -1027,7 +1038,10 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	    _cairo_gl_surface_fill_alpha_channel (dst, ctx,
 						  dst_x, dst_y,
 						  width, height);
+
 	}
+	if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
+	    dst->content_in_texture = TRUE;
     } else {
         cairo_surface_t *tmp;
 
@@ -1067,6 +1081,8 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
         }
 
         cairo_surface_destroy (tmp);
+	if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
+	    dst->content_in_texture = TRUE;
     }
 
 FAIL:
@@ -1080,6 +1096,7 @@ FAIL:
 
     if (likely (status))
 	dst->content_changed = TRUE;
+
     return status;
 }
 
@@ -1118,8 +1135,7 @@ _cairo_gl_surface_finish (void *abstract_surface)
 
     if (surface->msaa_depth_stencil)
 	ctx->dispatch.DeleteRenderbuffers (1, &surface->msaa_depth_stencil);
-
-#if CAIRO_HAS_GL_SURFACE
+#if CAIRO_HAS_GL_SURFACE || CAIRO_HAS_GLESV3_SURFACE
     if (surface->msaa_fb)
 	ctx->dispatch.DeleteFramebuffers (1, &surface->msaa_fb);
     if (surface->msaa_rb)
@@ -1178,7 +1194,8 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
 	return NULL;
     }
 
-    if (_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES) {
+    if (_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES2 ||
+	_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES3) {
 	/* If only RGBA is supported, we must download data in a compatible
 	 * format. This means that pixman will convert the data on the CPU when
 	 * interacting with other image surfaces. For ALPHA, GLES2 does not
@@ -1227,13 +1244,30 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
      * fall back instead.
      */
     _cairo_gl_composite_flush (ctx);
-    _cairo_gl_context_set_destination (ctx, surface, FALSE);
+
+    if (ctx->gl_flavor != CAIRO_GL_FLAVOR_ES3)
+	_cairo_gl_context_set_destination (ctx, surface, FALSE);
+    else {
+	if (surface->content_in_texture) {
+	    _cairo_gl_ensure_framebuffer (ctx, surface);
+	    ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->fb);
+	}
+	else {
+	    status = _cairo_gl_surface_resolve_multisampling (surface);
+ 	    if (unlikely (status)) {
+		status = _cairo_gl_context_release (ctx, status);
+		cairo_surface_destroy (&image->base);
+		return _cairo_image_surface_create_in_error (status);
+	    }
+	}
+    }
 
     flipped = ! _cairo_gl_surface_is_texture (surface);
     mesa_invert = flipped && ctx->has_mesa_pack_invert;
 
     glPixelStorei (GL_PACK_ALIGNMENT, 4);
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
+	ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
 	glPixelStorei (GL_PACK_ROW_LENGTH, image->stride / cpp);
     if (mesa_invert)
 	glPixelStorei (GL_PACK_INVERT_MESA, 1);
@@ -1281,6 +1315,7 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
     }
 
     image->base.is_clear = FALSE;
+
     return image;
 }
 
@@ -1398,7 +1433,10 @@ _cairo_gl_surface_resolve_multisampling (cairo_gl_surface_t *surface)
 	return CAIRO_INT_STATUS_SUCCESS;
 
     /* GLES surfaces do not need explicit resolution. */
-    if (((cairo_gl_context_t *) surface->base.device)->gl_flavor == CAIRO_GL_FLAVOR_ES)
+    if (((cairo_gl_context_t *) surface->base.device)->gl_flavor == CAIRO_GL_FLAVOR_ES2)
+	return CAIRO_INT_STATUS_SUCCESS;
+    else if (((cairo_gl_context_t *) surface->base.device)->gl_flavor == CAIRO_GL_FLAVOR_ES3 && 
+	     surface->content_in_texture)
 	return CAIRO_INT_STATUS_SUCCESS;
 
     if (! _cairo_gl_surface_is_texture (surface))
@@ -1408,10 +1446,14 @@ _cairo_gl_surface_resolve_multisampling (cairo_gl_surface_t *surface)
     if (unlikely (status))
 	return status;
 
-    ctx->current_target = surface;
+    _cairo_gl_composite_flush (ctx);
 
-#if CAIRO_HAS_GL_SURFACE
+    ctx->current_target = NULL;
+
+#if CAIRO_HAS_GL_SURFACE || CAIRO_HAS_GLESV3_SURFACE
     _cairo_gl_context_bind_framebuffer (ctx, surface, FALSE);
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
+	surface->content_in_texture = TRUE;
 #endif
 
     status = _cairo_gl_context_release (ctx, status);
