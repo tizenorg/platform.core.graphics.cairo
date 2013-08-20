@@ -462,7 +462,6 @@ _cairo_gl_ensure_framebuffer (cairo_gl_context_t *ctx,
                               cairo_gl_surface_t *surface)
 {
     GLenum status;
-    GLenum buf;
     cairo_gl_dispatch_t *dispatch = &ctx->dispatch;
 
     if (likely (surface->fb))
@@ -491,10 +490,6 @@ _cairo_gl_ensure_framebuffer (cairo_gl_context_t *ctx,
 
 #if CAIRO_HAS_GL_SURFACE
     glDrawBuffer (GL_COLOR_ATTACHMENT0);
-    glReadBuffer (GL_COLOR_ATTACHMENT0);
-#elif CAIRO_HAS_GLESV3_SURFACE
-    buf = GL_COLOR_ATTACHMENT0;
-    glDrawBuffers (1, &buf);
     glReadBuffer (GL_COLOR_ATTACHMENT0);
 #endif
 
@@ -865,9 +860,6 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
                                    cairo_bool_t multisampling)
 {
     cairo_bool_t changing_surface, changing_sampling;
-#if CAIRO_HAS_GLESV3_SURFACE
-    GLenum buf;
-#endif
 
     /* The decision whether or not to use multisampling happens when
      * we create an OpenGL ES surface, so we can never switch modes. */
@@ -905,10 +897,6 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
 #if CAIRO_HAS_GL_SURFACE
 	glDrawBuffer (GL_BACK_LEFT);
 	glReadBuffer (GL_BACK_LEFT);
-#elif CAIRO_HAS_GLESV3_SURFACE
-	buf = GL_BACK;
-	glDrawBuffers (1, &buf);
-	glReadBuffer (GL_BACK);
 #endif
     }
 
