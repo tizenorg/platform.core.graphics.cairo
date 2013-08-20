@@ -95,7 +95,6 @@ typedef struct _cairo_egl_context {
 
     EGLContext previous_context;
     EGLSurface previous_surface;
-
 } cairo_egl_context_t;
 
 typedef struct _cairo_egl_surface {
