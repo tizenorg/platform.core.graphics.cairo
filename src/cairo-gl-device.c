@@ -1011,12 +1011,15 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
 	       ctx->has_angle_multisampling))
 	multisampling = TRUE;
 
-    changing_surface = ctx->current_target != surface || surface->needs_update;
+    changing_surface = ctx->current_target != surface || surface->size_changed;
     changing_sampling = (surface->msaa_active != multisampling ||
 			 surface->content_in_texture);
 
-    if (! changing_surface && ! changing_sampling)
+    if (! changing_surface && ! changing_sampling) {
+	if (surface->needs_update)
+	    _cairo_gl_composite_flush (ctx);
 	return;
+    }
     if (! changing_surface) {
 	_cairo_gl_composite_flush (ctx);
 	_cairo_gl_context_bind_framebuffer (ctx, surface, multisampling);

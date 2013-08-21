@@ -794,7 +794,14 @@ query_surface_capabilities (cairo_gl_surface_t *surface)
     samples = 4;
     stencil_bits = 4;
     surface->supports_stencil = stencil_bits > 0;
-    surface->supports_msaa = samples > 1;
+
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
+	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
+	 ctx->has_angle_multisampling))
+	surface->supports_msaa = TRUE;
+    else
+	surface->supports_msaa = samples > 1;
+
     surface->num_samples = samples;
 
     status = _cairo_gl_context_release (ctx, status);
