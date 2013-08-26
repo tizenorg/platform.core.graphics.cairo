@@ -636,6 +636,8 @@ _cairo_gl_surface_init (cairo_device_t *device,
 
     surface->clip_on_stencil_buffer = NULL;
 
+    surface->content_synced = TRUE;
+
     _cairo_gl_surface_embedded_operand_init (surface);
 }
 
@@ -779,7 +781,16 @@ _cairo_gl_surface_clear (cairo_gl_surface_t  *surface,
     if (ctx->current_target == surface)
 	_cairo_gl_composite_flush (ctx);
 
-    _cairo_gl_context_set_destination (ctx, surface, surface->msaa_active);
+    /* FIXME:  for glesv3 and glesv2 with ANGLE extension of multisample
+       supports, it is much more expensive to paint texture back to
+       multisample renderbuffer.  Therefore, instead of clear
+       texture, we clear the renderbuffer.
+       In case, the next draw render target is texture, it will
+       blit renderbuffer back to texture */
+    if (ctx->gl_flavor != CAIRO_GL_FLAVOR_DESKTOP)
+	_cairo_gl_context_set_destination (ctx, surface, TRUE);
+    else
+	_cairo_gl_context_set_destination (ctx, surface, surface->msaa_active);
     if (surface->base.content & CAIRO_CONTENT_COLOR) {
         r = color->red   * color->alpha;
         g = color->green * color->alpha;
@@ -822,6 +833,7 @@ _cairo_gl_surface_clear (cairo_gl_surface_t  *surface,
 	surface->base.is_clear = TRUE;
 
     surface->content_changed = TRUE;
+    surface->content_synced = FALSE;
     return _cairo_gl_context_release (ctx, status);
 }
 
@@ -1288,6 +1300,7 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 						  width, height);
 
 	}
+	dst->content_synced = FALSE;
     } else {
         cairo_surface_t *tmp;
 
@@ -1338,8 +1351,10 @@ FAIL:
     if (rgba_clone)
 	cairo_surface_destroy (&rgba_clone->base);
 
-    if (status == CAIRO_INT_STATUS_SUCCESS)
+    if (status == CAIRO_INT_STATUS_SUCCESS) {
 	dst->content_changed = TRUE;
+	dst->content_synced = FALSE;
+    }
 
     return status;
 }
@@ -1712,8 +1727,10 @@ _cairo_gl_surface_paint (void			*surface,
     }
 
     if (source->shadow.draw_shadow_only) {
-	if (status == CAIRO_INT_STATUS_SUCCESS)
+	if (status == CAIRO_INT_STATUS_SUCCESS) {
 	    dst->content_changed = TRUE;
+	    dst->content_synced = FALSE;
+	}
  
 	ctx->source_scratch_in_use = FALSE;
 	cairo_device_release (dst->base.device);
@@ -1739,8 +1756,10 @@ _cairo_gl_surface_paint (void			*surface,
 
     status = _cairo_compositor_paint (get_compositor (surface), surface,
 				      op, source, clip);
-    if (status == CAIRO_INT_STATUS_SUCCESS)
+    if (status == CAIRO_INT_STATUS_SUCCESS) {
 	dst->content_changed = TRUE;
+	dst->content_synced = FALSE;
+    }
  
     ctx->source_scratch_in_use = FALSE;
     cairo_device_release (dst->base.device);
@@ -1771,8 +1790,10 @@ _cairo_gl_surface_mask (void			 *surface,
     }
 
     if (source->shadow.draw_shadow_only) {
-	if (status == CAIRO_INT_STATUS_SUCCESS)
+	if (status == CAIRO_INT_STATUS_SUCCESS) {
 	    dst->content_changed = TRUE;
+	    dst->content_synced = FALSE;
+ 	}
  
 	ctx->source_scratch_in_use = FALSE;
 	cairo_device_release (dst->base.device);
@@ -1782,7 +1803,8 @@ _cairo_gl_surface_mask (void			 *surface,
     status = _cairo_compositor_mask (get_compositor (surface), surface,
 				     op, source, mask, clip);
     if (status == CAIRO_INT_STATUS_SUCCESS) {
-	    dst->content_changed = TRUE;
+	dst->content_changed = TRUE;
+	dst->content_synced = FALSE;
  
 	ctx->source_scratch_in_use = FALSE;
 	cairo_device_release (dst->base.device);
@@ -1791,8 +1813,10 @@ _cairo_gl_surface_mask (void			 *surface,
 
     status = _cairo_compositor_mask (get_compositor (surface), surface,
 				     op, source, mask, clip);
-    if (status == CAIRO_INT_STATUS_SUCCESS)
+    if (status == CAIRO_INT_STATUS_SUCCESS) {
 	dst->content_changed = TRUE;
+	dst->content_synced = FALSE;
+    }
 
     ctx->source_scratch_in_use = FALSE;
     cairo_device_release (dst->base.device);
@@ -1833,6 +1857,7 @@ _cairo_gl_surface_stroke (void			        *surface,
     }
 
     dst->content_changed = TRUE;
+    dst->content_synced = FALSE;
 
     if (shadow_type == CAIRO_SHADOW_DROP &&
 	source->shadow.draw_shadow_only) {
@@ -1898,6 +1923,7 @@ _cairo_gl_surface_fill (void			*surface,
     }
 
     dst->content_changed = TRUE;
+    dst->content_synced = FALSE;
 
     if (shadow_type == CAIRO_SHADOW_DROP &&
 	source->shadow.draw_shadow_only) {
@@ -1972,6 +1998,7 @@ _cairo_gl_surface_glyphs (void			*surface,
     }
 
     dst->content_changed = TRUE;
+    dst->content_synced = FALSE;
 
     if (shadow_type == CAIRO_SHADOW_DROP &&
 	source->shadow.draw_shadow_only) {

@@ -837,16 +837,17 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
 	ctx->dispatch.Enable (GL_MULTISAMPLE);
 
 
-    /* The last time we drew to the surface, we were not using multisampling,
-       so we need to blit from the non-multisampling framebuffer into the
-       multisampling framebuffer. */
-    ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER, surface->msaa_fb);
-    ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->fb);
-    ctx->dispatch.BlitFramebuffer (0, 0, surface->width, surface->height,
-				   0, 0, surface->width, surface->height,
-				   GL_COLOR_BUFFER_BIT | 
-				   GL_STENCIL_BUFFER_BIT,
-				   GL_NEAREST);
+        /* The last time we drew to the surface, we were not using multisampling,
+        so we need to blit from the non-multisampling framebuffer into the
+        multisampling framebuffer. */
+	ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER, surface->msaa_fb);
+	ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->fb);
+	ctx->dispatch.BlitFramebuffer (0, 0, surface->width, surface->height,
+				       0, 0, surface->width, surface->height,
+				       GL_COLOR_BUFFER_BIT | 
+				       GL_STENCIL_BUFFER_BIT,
+				       GL_NEAREST);
+	surface->content_synced = TRUE;
     }
 #endif
 
@@ -916,6 +917,9 @@ bind_singlesample_framebuffer (cairo_gl_context_t *ctx,
 				   , GL_NEAREST);
     ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->fb);
 
+    surface->content_synced = TRUE;
+    
+    /* re-enable stencil and scissor test */
     if (stencil_test_enabled)
 	glEnable (GL_STENCIL_TEST);
     if (scissor_test_enabled)
