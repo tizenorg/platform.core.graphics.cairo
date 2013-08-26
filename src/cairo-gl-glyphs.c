@@ -355,6 +355,9 @@ render_glyphs (cairo_gl_surface_t *dst,
 	    }
 
 	    /* XXX Shoot me. */
+	    if (dst->msaa_active)
+		_cairo_gl_composite_set_multisample (&setup);
+
             status = _cairo_gl_composite_begin (&setup, &ctx);
             status = _cairo_gl_context_release (ctx, status);
 	    if (unlikely (status))

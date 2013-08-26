@@ -63,12 +63,8 @@ _cairo_gl_image_cache_init (cairo_gl_context_t *ctx, int width, int height,
     _cairo_surface_release_device_reference (cache_surface);
     *image_cache = _cairo_malloc (sizeof (cairo_gl_image_cache_t));
     (*image_cache)->surface = (cairo_gl_surface_t *)cache_surface;
-    if (! (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	   (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	    ctx->has_angle_multisampling)))
-	(*image_cache)->surface->supports_msaa = FALSE;
-    else
-	(*image_cache)->surface->supports_msaa = TRUE;
+    (*image_cache)->surface->supports_msaa = FALSE;
+
     _cairo_rtree_init (&((*image_cache)->rtree), width, height,
 		       IMAGE_CACHE_MIN_SIZE,
 		       sizeof (cairo_gl_image_t),
@@ -657,12 +653,6 @@ _cairo_gl_ensure_multisampling (cairo_gl_context_t *ctx,
 
     ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT);
 
-    /* for glesv3 with multisample renderbuffer, we always render to
-       this renderbuffer */
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	 ctx->has_angle_multisampling))
-	surface->msaa_active = TRUE;
 }
 
 static cairo_bool_t
@@ -674,12 +664,6 @@ _cairo_gl_ensure_msaa_depth_stencil_buffer (cairo_gl_context_t *ctx,
 	return TRUE;
 
     //_cairo_gl_ensure_framebuffer (ctx, surface);
-
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
-	ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	 ctx->has_angle_multisampling))
-	_cairo_gl_ensure_multisampling (ctx, surface);
 
     dispatch->GenRenderbuffers (1, &surface->msaa_depth_stencil);
     dispatch->BindRenderbuffer (GL_RENDERBUFFER,
@@ -837,10 +821,6 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
 
 #endif
 	ctx->dispatch.BindFramebuffer (GL_FRAMEBUFFER, surface->msaa_fb);
-	if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	    (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	     ctx->has_angle_multisampling))
-	    surface->content_in_texture = FALSE;
 	return;
     }
 
@@ -860,13 +840,8 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
     /* The last time we drew to the surface, we were not using multisampling,
        so we need to blit from the non-multisampling framebuffer into the
        multisampling framebuffer. */
-#if CAIRO_HAS_GLESV2_SURFACE
-    ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER_ANGLE, surface->msaa_fb);
-    ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER_ANGLE, surface->fb);
-#else
     ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER, surface->msaa_fb);
     ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->fb);
-#endif
     ctx->dispatch.BlitFramebuffer (0, 0, surface->width, surface->height,
 				   0, 0, surface->width, surface->height,
 				   GL_COLOR_BUFFER_BIT | 
@@ -886,10 +861,6 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
 	    glEnable (GL_SCISSOR_TEST);
     }
 #endif
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	 ctx->has_angle_multisampling))
-	surface->content_in_texture = FALSE;
 }
 
 static void
@@ -986,7 +957,10 @@ _cairo_gl_context_bind_framebuffer (cairo_gl_context_t *ctx,
 #endif
     }
 
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
+	ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
+	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
+	 ctx->has_angle_multisampling))
 	surface->msaa_active = multisampling;
 
     if (ctx->gl_flavor != CAIRO_GL_FLAVOR_DESKTOP && multisampling)
@@ -1005,15 +979,9 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
 	! ctx->has_angle_multisampling)
 	multisampling = surface->msaa_active;
-    /* For GLESV3, we always use renderbuffer for drawing */
-    else if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	     (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	       ctx->has_angle_multisampling))
-	multisampling = TRUE;
 
     changing_surface = ctx->current_target != surface || surface->size_changed;
-    changing_sampling = (surface->msaa_active != multisampling ||
-			 surface->content_in_texture);
+    changing_sampling = surface->msaa_active != multisampling;
 
     if (! changing_surface && ! changing_sampling) {
 	if (surface->needs_update)

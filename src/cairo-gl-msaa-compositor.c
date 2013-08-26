@@ -150,8 +150,8 @@ _draw_traps (cairo_gl_context_t		*ctx,
    return status;
 }
 
-cairo_int_status_t
-_cairo_draw_int_rect (cairo_gl_context_t	*ctx,
+static cairo_int_status_t
+_draw_int_rect (cairo_gl_context_t	*ctx,
 		      cairo_gl_composite_t	*setup,
 		      cairo_rectangle_int_t	*rect)
 {
@@ -250,6 +250,67 @@ _cairo_gl_msaa_compositor_draw_clip (cairo_gl_context_t *ctx,
     return status;
 }
 
+static cairo_int_status_t
+_blit_texture_to_renderbuffer (cairo_gl_surface_t *surface)
+{
+    cairo_gl_context_t *ctx = NULL;
+    cairo_gl_composite_t setup;
+    cairo_surface_pattern_t pattern;
+    cairo_rectangle_int_t extents;
+    cairo_int_status_t status;
+    cairo_gl_flavor_t gl_flavor = ((cairo_gl_context_t *) surface->base.device)->gl_flavor;
+
+    if (gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+	return CAIRO_INT_STATUS_SUCCESS;
+    else if (! _cairo_gl_surface_is_texture (surface))
+	return CAIRO_INT_STATUS_SUCCESS;
+    else if (surface->msaa_active)
+	return CAIRO_INT_STATUS_SUCCESS;
+
+    memset (&setup, 0, sizeof (cairo_gl_composite_t));
+
+    status = _cairo_gl_composite_set_operator (&setup,
+					       CAIRO_OPERATOR_SOURCE,
+					       FALSE);
+    if (status)
+	return status;
+
+    setup.dst = surface;
+    setup.clip_region = surface->clip_region;
+
+    _cairo_pattern_init_for_surface (&pattern, &surface->base);
+
+    extents.x = extents.y = 0;
+    extents.width = surface->width;
+    extents.height = surface->height;
+
+    status = _cairo_gl_composite_set_source (&setup, &pattern.base,
+					     NULL, &extents, FALSE, FALSE);
+    _cairo_pattern_fini (&pattern.base);
+
+    if (unlikely (status))
+	goto FAIL;
+
+    _cairo_gl_composite_set_multisample (&setup);
+
+    status = _cairo_gl_composite_begin (&setup, &ctx);
+
+    if (unlikely (status))
+	goto FAIL;
+
+    status = _draw_int_rect (ctx, &setup, &extents);
+FAIL:
+    _cairo_gl_composite_fini (&setup);
+
+    if (ctx) {
+	_cairo_gl_composite_flush (ctx);
+	status = _cairo_gl_context_release (ctx, status);
+    }
+
+    return status;
+}
+
+
 static cairo_bool_t
 _should_use_unbounded_surface (cairo_composite_rectangles_t *composite)
 {
@@ -312,6 +373,7 @@ can_use_msaa_compositor (cairo_gl_surface_t *surface,
 			 cairo_antialias_t antialias)
 {
     cairo_gl_flavor_t flavor = ((cairo_gl_context_t *) surface->base.device)->gl_flavor;
+    cairo_bool_t has_angle_multisampling = ((cairo_gl_context_t *) surface->base.device)->has_angle_multisampling;
 
     query_surface_capabilities (surface);
     if (! surface->supports_stencil)
@@ -320,9 +382,11 @@ can_use_msaa_compositor (cairo_gl_surface_t *surface,
     /* Multisampling OpenGL ES surfaces only maintain one multisampling
        framebuffer and thus must use the spans compositor to do non-antialiased
        rendering. */
-    if (flavor != CAIRO_GL_FLAVOR_DESKTOP &&
+    if (! (flavor == CAIRO_GL_FLAVOR_DESKTOP ||
+	   flavor == CAIRO_GL_FLAVOR_ES3 ||
+	   (flavor == CAIRO_GL_FLAVOR_ES2 &&
+	    has_angle_multisampling)) &&
 	surface->supports_msaa &&
-	surface->num_samples > 1 &&
 	antialias == CAIRO_ANTIALIAS_NONE)
 	return FALSE;
 
@@ -388,6 +452,10 @@ _cairo_gl_msaa_compositor_mask_source_operator (const cairo_compositor_t *compos
 	}
     }
 
+    status = _blit_texture_to_renderbuffer (dst);
+    if (unlikely (status))
+	return status;
+
     status = _cairo_gl_composite_init (&setup,
 				       CAIRO_OPERATOR_DEST_OUT,
 				       dst,
@@ -409,7 +477,7 @@ _cairo_gl_msaa_compositor_mask_source_operator (const cairo_compositor_t *compos
 	goto finish;
 
     if (! clip)
-	status = _cairo_draw_int_rect (ctx, &setup, &composite->bounded);
+	status = _draw_int_rect (ctx, &setup, &composite->bounded);
     else
 	status = _draw_traps (ctx, &setup, &traps);
     if (unlikely (status))
@@ -442,7 +510,7 @@ _cairo_gl_msaa_compositor_mask_source_operator (const cairo_compositor_t *compos
 	goto finish;
 
     if (! clip)
-	status = _cairo_draw_int_rect (ctx, &setup, &composite->bounded);
+	status = _draw_int_rect (ctx, &setup, &composite->bounded);
     else
 	status = _draw_traps (ctx, &setup, &traps);
 
@@ -520,6 +588,10 @@ _cairo_gl_msaa_compositor_mask (const cairo_compositor_t	*compositor,
 	return _paint_back_unbounded_surface (compositor, composite, surface);
     }
 
+    status = _blit_texture_to_renderbuffer (dst);
+    if (unlikely (status))
+	return status;
+
     status = _cairo_gl_composite_init (&setup,
 				       op,
 				       dst,
@@ -556,7 +628,7 @@ _cairo_gl_msaa_compositor_mask (const cairo_compositor_t	*compositor,
 
     if (op != CAIRO_OPERATOR_OVER) {
 	if (! clip)
-	    status = _cairo_draw_int_rect (ctx, &setup, &composite->bounded);
+	    status = _draw_int_rect (ctx, &setup, &composite->bounded);
 	else
 	    status = _cairo_gl_msaa_compositor_draw_clip (ctx, &setup, clip);
     }
@@ -583,7 +655,7 @@ _cairo_gl_msaa_compositor_mask (const cairo_compositor_t	*compositor,
 	    _cairo_clip_destroy (clip_copy);
 	}
 	else
-	    status = _cairo_draw_int_rect (ctx, &setup, &rect);
+	    status = _draw_int_rect (ctx, &setup, &rect);
     }
 
 finish:
@@ -795,12 +867,7 @@ query_surface_capabilities (cairo_gl_surface_t *surface)
     stencil_bits = 4;
     surface->supports_stencil = stencil_bits > 0;
 
-    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3 ||
-	(ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
-	 ctx->has_angle_multisampling))
-	surface->supports_msaa = TRUE;
-    else
-	surface->supports_msaa = samples > 1;
+    surface->supports_msaa = samples > 1;
 
     surface->num_samples = samples;
 
@@ -858,6 +925,10 @@ _cairo_gl_msaa_compositor_stroke (const cairo_compositor_t	*compositor,
 
 	return _paint_back_unbounded_surface (compositor, composite, surface);
     }
+
+    status = _blit_texture_to_renderbuffer (dst);
+    if (unlikely (status))
+	return status;
 
     status = _cairo_gl_composite_init (&info.setup,
 				       composite->op,
@@ -1025,6 +1096,10 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
 	return _paint_back_unbounded_surface (compositor, composite, surface);
     }
 
+    status = _blit_texture_to_renderbuffer (dst);
+    if (unlikely (status))
+	return status;
+
     draw_path_with_traps = ! _cairo_path_fixed_is_simple_quad (path);
 
     status = _cairo_gl_composite_init (&setup,
@@ -1140,6 +1215,10 @@ _cairo_gl_msaa_compositor_glyphs (const cairo_compositor_t	*compositor,
 
 	return _paint_back_unbounded_surface (compositor, composite, surface);
     }
+
+    status = _blit_texture_to_renderbuffer (dst);
+    if (unlikely (status))
+	return status;
 
     src = _cairo_gl_pattern_to_source (&dst->base,
 				       composite->original_source_pattern,
