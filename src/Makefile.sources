@@ -129,6 +129,7 @@ cairo_private = \
 	cairo-time-private.h \
 	cairo-types-private.h \
 	cairo-traps-private.h \
+    cairo-convex-fill-private.h \
 	cairo-tristrip-private.h \
 	cairo-user-font-private.h \
 	cairo-wideint-private.h \
@@ -195,6 +196,7 @@ cairo_sources = \
 	cairo-path.c \
 	cairo-path-fill.c \
 	cairo-path-fixed.c \
+    cairo-convex-fill.c \
 	cairo-path-in-fill.c \
 	cairo-path-stroke.c \
 	cairo-path-stroke-boxes.c \

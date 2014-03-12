@@ -2075,6 +2075,7 @@ typedef struct cairo_path {
     cairo_status_t status;
     cairo_path_data_t *data;
     int num_data;
+    unsigned int is_convex         : 1;
 } cairo_path_t;
 
 cairo_public cairo_path_t *
