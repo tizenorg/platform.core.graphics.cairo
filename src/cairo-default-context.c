@@ -1111,9 +1111,12 @@ _cairo_default_context_append_path (void *abstract_cr,
 				    const cairo_path_t *path)
 {
     cairo_default_context_t *cr = abstract_cr;
+    cairo_bool_t can_apply_convex = _cairo_path_fixed_is_empty (cr->path);
 
-    cr->path->is_convex = path->is_convex;
-    return _cairo_path_append_to_context (path, &cr->base);
+    cairo_status_t status = _cairo_path_append_to_context (path, &cr->base);
+    if (can_apply_convex && path->is_convex)
+        cr->path->is_convex = path->is_convex;
+    return status;
 }
 
 static cairo_status_t
