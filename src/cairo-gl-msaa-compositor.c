@@ -883,7 +883,7 @@ _cairo_gl_msaa_compositor_stroke (const cairo_compositor_t	*compositor,
            trade-off quality vs performance, for hairline, we disable
            overlapping
 	*/
-        
+        /*
 	if (! (_is_continuous_arc (path, style) ||
 	       _is_continuous_single_line (path, style) ||
                path->is_convex)) {
@@ -893,7 +893,7 @@ _cairo_gl_msaa_compositor_stroke (const cairo_compositor_t	*compositor,
 	    if (unlikely (status))
 		goto finish;
 	}
-        
+        */
 
 	closure.ctx = info.ctx;
 
