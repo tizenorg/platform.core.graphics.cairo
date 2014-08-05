@@ -123,9 +123,8 @@ _cairo_gl_hairline_style_is_hairline (const cairo_stroke_style_t *style,
     x = fabs (x - 1.0);
     y = fabs (y - 1.0);
 
+    // do not consider line join
     return style->line_width == 1.0 &&
-        (style->line_join != CAIRO_LINE_JOIN_MITER ||
-         style->miter_limit <= 10.0) &&
         (x <= SCALE_TOLERANCE && y <= SCALE_TOLERANCE);
 }
 
