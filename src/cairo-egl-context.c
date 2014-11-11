@@ -169,6 +169,12 @@ _egl_make_current_surfaceless(cairo_egl_context_t *ctx)
     return TRUE;
 }
 
+static cairo_gl_generic_func_t
+_cairo_egl_get_proc_address (void *data, const char *name)
+{
+    return eglGetProcAddress (name);
+}
+
 cairo_device_t *
 cairo_egl_device_create (EGLDisplay dpy, EGLContext egl)
 {
@@ -227,7 +233,8 @@ cairo_egl_device_create (EGLDisplay dpy, EGLContext egl)
 	}
     }
 
-    status = _cairo_gl_dispatch_init (&ctx->base.dispatch, eglGetProcAddress);
+    status = _cairo_gl_dispatch_init (&ctx->base.dispatch,
+				      _cairo_egl_get_proc_address, NULL);
     if (unlikely (status)) {
 	free (ctx);
 	return _cairo_gl_context_create_in_error (status);

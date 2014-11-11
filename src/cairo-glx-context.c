@@ -82,7 +82,7 @@ _glx_get_current_drawable (cairo_glx_context_t *ctx)
     return ((cairo_glx_surface_t *) ctx->base.current_target)->win;
 }
 
-static void
+static void *
 _glx_query_current_state (cairo_glx_context_t * ctx)
 {
     ctx->previous_context = glXGetCurrentContext ();
@@ -203,6 +203,12 @@ _glx_dummy_window (Display *dpy, GLXContext gl_ctx, Window *dummy)
     return CAIRO_STATUS_SUCCESS;
 }
 
+static cairo_gl_generic_func_t
+_cairo_glx_get_proc_address (void *data, const char *name)
+{
+    return glXGetProcAddress (name);
+}
+
 cairo_device_t *
 cairo_glx_device_create (Display *dpy, GLXContext gl_ctx)
 {
@@ -238,7 +244,8 @@ cairo_glx_device_create (Display *dpy, GLXContext gl_ctx)
     ctx->base.destroy = _glx_destroy;
 
     status = _cairo_gl_dispatch_init (&ctx->base.dispatch,
-				      (cairo_gl_get_proc_addr_func_t) glXGetProcAddress);
+				      (cairo_gl_get_proc_addr_func_t) _cairo_glx_get_proc_address,
+				      NULL);
     if (unlikely (status)) {
 	free (ctx);
 	return _cairo_gl_context_create_in_error (status);

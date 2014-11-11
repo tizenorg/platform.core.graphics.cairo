@@ -414,9 +414,37 @@ cairo_glesv3_headers = $(cairo_gl_headers)
 cairo_glesv3_private = $(cairo_gl_private)
 cairo_glesv3_sources = $(cairo_gl_sources)
 
+cairo_evasgl_headers =
+cairo_evasgl_private =
+cairo_evasgl_sources =
+if CAIRO_HAS_EVASGL_SURFACE
+if CAIRO_HAS_GL_SURFACE
+cairo_evasgl_headers =
+cairo_evasgl_private =
+cairo_evasgl_sources =
+else
+if CAIRO_HAS_GLESV2_SURFACE
+cairo_evasgl_headers =
+cairo_evasgl_private =
+cairo_evasgl_sources =
+else
+if CAIRO_HAS_GLESV3_SURFACE
+cairo_evasgl_headers =
+cairo_evasgl_private =
+cairo_evasgl_sources =
+else
+cairo_evasgl_headers = $(cairo_gl_headers)
+cairo_evasgl_private = $(cairo_gl_private)
+cairo_evasgl_sources = $(cairo_gl_sources)
+endif
+endif
+endif
+endif
+
 cairo_egl_sources += cairo-egl-context.c
 cairo_glx_sources += cairo-glx-context.c
 cairo_wgl_sources += cairo-wgl-context.c
+cairo_evasgl_sources += cairo-evas-gl-context.c
 
 cairo_directfb_headers = cairo-directfb.h
 cairo_directfb_sources = cairo-directfb-surface.c

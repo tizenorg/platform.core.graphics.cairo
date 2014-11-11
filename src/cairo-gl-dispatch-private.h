@@ -72,11 +72,11 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(ClearStencil),
     DISPATCH_ENTRY_CORE	(ColorMask),
     DISPATCH_ENTRY_CORE	(DeleteTextures),
-    DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_CORE	(Disable),
     DISPATCH_ENTRY_CORE	(DrawArrays),
     DISPATCH_ENTRY_CORE	(DrawElements),
     DISPATCH_ENTRY_CORE	(Enable),
+    DISPATCH_ENTRY_CORE	(Flush),
     DISPATCH_ENTRY_CORE	(GenTextures),
     DISPATCH_ENTRY_CORE	(GetBooleanv),
     DISPATCH_ENTRY_CORE	(GetError),
@@ -96,7 +96,7 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(DrawBuffer),
     DISPATCH_ENTRY_CORE	(ReadBuffer),
 #endif
-    DISPATCH_ENTRY_CORE	(DepthMask),
+    //DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_LAST
 };
 
@@ -162,8 +162,23 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_fbo_entries[] = {
 };
 
 cairo_private cairo_gl_dispatch_entry_t dispatch_multisampling_entries[] = {
+#if CAIRO_HAS_GLESV2_SURFACE
+    DISPATCH_ENTRY_EXT_IMG (BlitFramebuffer),
     DISPATCH_ENTRY_EXT_IMG (RenderbufferStorageMultisample),
     DISPATCH_ENTRY_EXT_IMG (FramebufferTexture2DMultisample),
+#elif CAIRO_HAS_EVASGL_SURFACE
+    DISPATCH_ENTRY_EXT_IMG (BlitFramebuffer),
+    DISPATCH_ENTRY_EXT_IMG (RenderbufferStorageMultisample),
+    DISPATCH_ENTRY_EXT_IMG (FramebufferTexture2DMultisample),
+
+    DISPATCH_ENTRY_EXT_IMG (BlitFramebuffer),
+    DISPATCH_ENTRY_EXT_IMG (RenderbufferStorageMultisample),
+    DISPATCH_ENTRY_EXT_IMG (FramebufferTexture2DMultisample),
+#else
+    DISPATCH_ENTRY_EXT_IMG (BlitFramebuffer),
+    DISPATCH_ENTRY_EXT_IMG (RenderbufferStorageMultisample),
+    DISPATCH_ENTRY_EXT_IMG (FramebufferTexture2DMultisample),
+#endif
     DISPATCH_ENTRY_LAST
 };
 

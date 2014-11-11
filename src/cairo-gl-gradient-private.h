@@ -60,6 +60,8 @@
 #elif CAIRO_HAS_GLESV3_SURFACE
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
+#elif CAIRO_HAS_EVASGL_SURFACE
+#include <Evas_GL.h>
 #endif
 
 #define CAIRO_GL_GRADIENT_CACHE_SIZE 4096

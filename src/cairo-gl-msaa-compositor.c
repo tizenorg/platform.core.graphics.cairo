@@ -787,8 +787,10 @@ query_surface_capabilities (cairo_gl_surface_t *surface)
 
     _cairo_gl_context_set_destination (ctx, surface, FALSE);
 
-    ctx->dispatch.GetIntegerv(GL_SAMPLES, &samples);
-    ctx->dispatch.GetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+    //ctx->dispatch.GetIntegerv(GL_SAMPLES, &samples);
+    //ctx->dispatch.GetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+    samples = 4;
+    stencil_bits = 4;
     surface->supports_stencil = stencil_bits > 0;
     surface->supports_msaa = samples > 1;
     surface->num_samples = samples;

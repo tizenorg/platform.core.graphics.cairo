@@ -361,6 +361,24 @@ CAIRO_ENABLE_SURFACE_BACKEND(gl, OpenGL, no, [
   need_glx_functions=yes
   need_wgl_functions=yes
   need_egl_functions=yes
+  need_evasgl_functions=yes
+])
+
+dnl ===========================================================================
+CAIRO_ENABLE_SURFACE_BACKEND(evasgl, EvasGL, no, [
+  evasgl_REQUIRES="evas"
+  PKG_CHECK_MODULES(evasgl, $evasgl_REQUIRES,, [
+	  dnl Fallback to searching for headers
+	  AC_CHECK_HEADER(evas-1/Evas_GL.h,, [use_evasgl="no (evas.pc nor EvasGL headers not found)"])
+	  gl_NONPKGCONFIG_CFLAGS=
+	  gl_NONPKGCONFIG_LIBS="-levas"
+	  ])
+
+  if test "x$have_dl" = "xyes" -a "x$have_dlsym" = "xyes"; then
+    gl_LIBS="$gl_LIBS -ldl"
+  fi
+
+  need_evasgl_functions=yes
 ])
 
 dnl ===========================================================================

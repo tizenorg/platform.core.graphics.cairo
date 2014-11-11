@@ -67,7 +67,7 @@ _cairo_gl_get_flavor (cairo_gl_dispatch_t *dispatch)
     else if (strstr (version, "OpenGL ES 2") != NULL)
 	flavor = CAIRO_GL_FLAVOR_ES2;
     else if (strstr (version, "OpenGL ES 3") != NULL)
-#if CAIRO_HAS_GLESV3_SURFACE
+#if CAIRO_HAS_GLESV3_SURFACE || CAIRO_HAS_EVASGL_SURFACE
 	flavor = CAIRO_GL_FLAVOR_ES3;
 #elif CAIRO_HAS_GLESV2_SURFACE
 	flavor = CAIRO_GL_FLAVOR_ES2;

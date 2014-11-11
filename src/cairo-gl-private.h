@@ -70,6 +70,8 @@
 #elif CAIRO_HAS_GLESV3_SURFACE
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
+#elif CAIRO_HAS_EVASGL_SURFACE
+#include <Evas_GL.h>
 #endif
 
 #include "cairo-gl-ext-def-private.h"
@@ -112,6 +114,13 @@
 
 typedef struct _cairo_gl_surface cairo_gl_surface_t;
 typedef struct _cairo_gl_image   cairo_gl_image_t;
+
+/* Mali or SGX driver */
+typedef enum _cairo_gl_multisample_ext_type {
+    CAIRO_GL_EXT_MULTISAMPLE_TO_TEXTURE,
+    CAIRO_GL_IMG_MULTISAMPLE_TO_TEXTURE,
+    CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE
+} cairo_gl_multisample_ext_type;
 
 /* GL flavor */
 typedef enum cairo_gl_flavor {
@@ -332,7 +341,7 @@ typedef void (*cairo_gl_emit_glyph_t) (cairo_gl_context_t *ctx,
 #define CAIRO_GL_VAR_TYPE_MAX (1 << 12)
 
 typedef void (*cairo_gl_generic_func_t)(void);
-typedef cairo_gl_generic_func_t (*cairo_gl_get_proc_addr_func_t)(const char *procname);
+typedef cairo_gl_generic_func_t (*cairo_gl_get_proc_addr_func_t)(void *data, const char *procname);
 
 typedef struct _cairo_gl_dispatch {
     /* common */
@@ -346,11 +355,11 @@ typedef struct _cairo_gl_dispatch {
     void (*ClearStencil) (GLint s);
     void (*ColorMask) (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
     void (*DeleteTextures) (GLsizei n, const GLuint *textures);
-    void (*DepthMask) (GLboolean flag);
     void (*Disable) (GLenum cap);
     void (*DrawArrays) (GLenum mode, GLint first, GLsizei count);
     void (*DrawElements) (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
     void (*Enable) (GLenum cap);
+    void (*Flush) (void);
     void (*GenTextures) (GLsizei n, GLuint *textures);
     void (*GetBooleanv) (GLenum pname, GLboolean *data);
     GLenum (*GetError) (void);
@@ -373,7 +382,7 @@ typedef struct _cairo_gl_dispatch {
 			GLint border, GLenum format,
 			GLenum type, const GLvoid *data);
     void (*TexParameteri) (GLenum target, GLenum pname, GLint param);
-#if CAIRO_HAS_GL_SURFACE
+#if defined(CAIRO_HAS_GL_SURFACE) || defined(CAIRO_HAS_EVASGL_SURFACE)
     void (*DrawBuffer) (GLenum buf);
     void (*ReadBuffer) (GLenum buf);
 #endif
@@ -537,6 +546,7 @@ struct _cairo_gl_context {
 
     /* Intermediate mask surface for glyph rendering. Created on first access, enlarged on demand. */
     cairo_gl_surface_t *glyph_mask;
+    cairo_gl_multisample_ext_type msaa_type;
 
     void (*acquire) (void *ctx);
     void (*release) (void *ctx);
@@ -928,7 +938,8 @@ _cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext);
 
 cairo_private cairo_status_t
 _cairo_gl_dispatch_init(cairo_gl_dispatch_t *dispatch,
-			cairo_gl_get_proc_addr_func_t get_proc_addr);
+			cairo_gl_get_proc_addr_func_t get_proc_addr,
+			void *data);
 
 cairo_private cairo_int_status_t
 _cairo_gl_operand_init (cairo_gl_operand_t *operand,

@@ -235,6 +235,18 @@ enabled_cairo_boilerplate_cxx_sources += $(cairo_boilerplate_gl_cxx_sources)
 enabled_cairo_boilerplate_sources += $(cairo_boilerplate_gl_sources)
 endif
 
+unsupported_cairo_boilerplate_headers += $(cairo_boilerplate_evasgl_headers)
+all_cairo_boilerplate_headers += $(cairo_boilerplate_evasgl_headers)
+all_cairo_boilerplate_private += $(cairo_boilerplate_evasgl_private)
+all_cairo_boilerplate_cxx_sources += $(cairo_boilerplate_evasgl_cxx_sources)
+all_cairo_boilerplate_sources += $(cairo_boilerplate_evasgl_sources)
+ifeq ($(CAIRO_HAS_EVASGL_SURFACE),1)
+enabled_cairo_boilerplate_headers += $(cairo_boilerplate_evasgl_headers)
+enabled_cairo_boilerplate_private += $(cairo_boilerplate_evasgl_private)
+enabled_cairo_boilerplate_cxx_sources += $(cairo_boilerplate_evasgl_cxx_sources)
+enabled_cairo_boilerplate_sources += $(cairo_boilerplate_evasgl_sources)
+endif
+
 unsupported_cairo_boilerplate_headers += $(cairo_boilerplate_glesv2_headers)
 all_cairo_boilerplate_headers += $(cairo_boilerplate_glesv2_headers)
 all_cairo_boilerplate_private += $(cairo_boilerplate_glesv2_private)
