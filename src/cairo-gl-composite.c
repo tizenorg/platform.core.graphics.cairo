@@ -649,7 +649,7 @@ _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
 
     /* The clip is not rectangular, so use the stencil buffer. */
     if (! ctx->states_cache.depth_mask ) {
-	ctx->dispatch.DepthMask (GL_TRUE);
+	glDepthMask (GL_TRUE);
 	ctx->states_cache.depth_mask = TRUE;
     }
 

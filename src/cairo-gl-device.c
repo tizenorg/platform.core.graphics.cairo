@@ -355,12 +355,15 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
     }
 #endif
 
-#if CAIRO_HAS_GLESV2_SURFACE && defined (GL_MAX_SAMPLES_ANGLE)
-    if (is_gles && ctx->has_packed_depth_stencil &&
+#if (CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_EVASGL_SURFACE) && GL_MAX_SAMPLES_ANGLE
+    if (ctx->num_samples == 1 &&
+	is_gles &&
+	ctx->has_packed_depth_stencil &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_ANGLE_framebuffer_blit") &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_ANGLE_framebuffer_multisample")) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES_ANGLE, &ctx->num_samples);
-	ctx->has_angle_multisampling = TRUE;
+	if (ctx->num_samples > 1)
+	    ctx->has_angle_multisampling = TRUE;
     }
 #endif
 
@@ -593,7 +596,7 @@ _cairo_gl_ensure_multisampling (cairo_gl_context_t *ctx,
 				cairo_gl_surface_t *surface)
 {
     GLenum rgba;
-    
+
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 &&
 	! ctx->has_angle_multisampling)
 	return;
@@ -906,9 +909,17 @@ bind_singlesample_framebuffer (cairo_gl_context_t *ctx,
     /* The last time we drew to the surface, we were using multisampling,
        so we need to blit from the multisampling framebuffer into the
        non-multisampling framebuffer. */
-#if CAIRO_HAS_GLESV2_SURFACE
-    ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER_ANGLE, surface->fb);
-    ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER_ANGLE, surface->msaa_fb);
+#if CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_EVASGL_SURFACE
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2) {
+	ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER_ANGLE, surface->fb);
+	ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER_ANGLE, surface->msaa_fb);
+    }
+#if CAIRO_HAS_EVASGL_SURFACE
+    else {
+	ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER, surface->fb);
+	ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->msaa_fb);
+    }
+#endif
 #else
     ctx->dispatch.BindFramebuffer (GL_DRAW_FRAMEBUFFER, surface->fb);
     ctx->dispatch.BindFramebuffer (GL_READ_FRAMEBUFFER, surface->msaa_fb);

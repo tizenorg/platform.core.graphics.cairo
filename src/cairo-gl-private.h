@@ -621,13 +621,13 @@ struct _cairo_gl_context {
     /* Intermediate mask surface for glyph rendering. Created on first access, enlarged on demand. */
     cairo_gl_surface_t *glyph_mask;
     /* Intermediate blur surface for gaussian blur. Created on first access, enlarged on demand. */
-    cairo_gl_multisample_ext_type msaa_type;
     cairo_gl_surface_t *source_scratch_surfaces[2];
     cairo_gl_surface_t *mask_scratch_surfaces[2];
     cairo_gl_surface_t *shadow_scratch_surfaces[3];
     cairo_gl_surface_t *shadow_masks[4];
     cairo_bool_t source_scratch_in_use;
     cairo_bool_t has_angle_multisampling;
+    cairo_gl_multisample_ext_type msaa_type;
 
     void (*acquire) (void *ctx);
     void (*release) (void *ctx);

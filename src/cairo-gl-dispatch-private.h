@@ -78,6 +78,7 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(ClearStencil),
     DISPATCH_ENTRY_CORE	(ColorMask),
     DISPATCH_ENTRY_CORE	(DeleteTextures),
+    DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_CORE	(Disable),
     DISPATCH_ENTRY_CORE	(DrawArrays),
     DISPATCH_ENTRY_CORE	(DrawElements),
@@ -102,7 +103,6 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(DrawBuffer),
     DISPATCH_ENTRY_CORE	(ReadBuffer),
 #endif
-    DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_CORE	(Viewport),
     DISPATCH_ENTRY_LAST
 };
@@ -177,7 +177,7 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_multisampling_entries[] = {
     DISPATCH_ENTRY_ES_ANGLE_EXT_IMG (BlitFramebuffer),
     DISPATCH_ENTRY_ES_ANGLE_EXT_IMG (RenderbufferStorageMultisample),
     DISPATCH_ENTRY_ES_ANGLE_EXT_IMG (FramebufferTexture2DMultisample),
-    
+
     DISPATCH_ENTRY_EXT_IMG (BlitFramebuffer),
     DISPATCH_ENTRY_EXT_IMG (RenderbufferStorageMultisample),
     DISPATCH_ENTRY_EXT_IMG (FramebufferTexture2DMultisample),

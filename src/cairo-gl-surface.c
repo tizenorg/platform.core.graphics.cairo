@@ -1716,6 +1716,9 @@ _cairo_gl_surface_flush (void *abstract_surface, unsigned flags)
 
     status = _cairo_gl_surface_resolve_multisampling (surface);
 
+    if (ctx->msaa_type != CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE)
+        ctx->dispatch.Flush ();
+
     return _cairo_gl_context_release (ctx, status);
 }
 
