@@ -132,7 +132,7 @@ _cairo_gl_glyph_cache_add_glyph (cairo_gl_context_t *ctx,
     /* XXX: Make sure we use the mask texture. This should work automagically somehow */
     if(ctx->states_cache.active_texture != GL_TEXTURE1)
     {
-        glActiveTexture (GL_TEXTURE1);
+        ctx->dispatch.ActiveTexture (GL_TEXTURE1);
         ctx->states_cache.active_texture = GL_TEXTURE1;
     }
     status = _cairo_gl_surface_draw_image (cache->surface, glyph_surface,
@@ -241,18 +241,18 @@ static void _cairo_gl_surface_clear_with_extent (cairo_gl_context_t *ctx,
 	    ctx->states_cache.clear_blue = 0;
 	    ctx->states_cache.clear_alpha = 0;
 
-	    glClearColor (0, 0, 0, 0);
+	    ctx->dispatch.ClearColor (0, 0, 0, 0);
 	}
 	if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP) {
 	    _enable_scissor_buffer (ctx);
-	    glScissor(0, 0, extent->width, extent->height);
+	    ctx->dispatch.Scissor(0, 0, extent->width, extent->height);
 	    _disable_stencil_buffer (ctx);
-	    glClear (GL_COLOR_BUFFER_BIT);
+	    ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT);
 	}
 	else {
 	    _disable_stencil_buffer (ctx);
 	    _disable_scissor_buffer (ctx);
-	    glClear (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	    ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 }
 

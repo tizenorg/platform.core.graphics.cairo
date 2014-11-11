@@ -725,7 +725,7 @@ _prevent_overlapping_strokes (cairo_gl_context_t 		*ctx,
 	    glDepthMask (GL_TRUE);
 	    ctx->states_cache.depth_mask = TRUE;
 	}
-	glEnable (GL_STENCIL_TEST);
+	ctx->dispatch.Enable (GL_STENCIL_TEST);
 	ctx->states_cache.stencil_test_enabled = TRUE;
 
 	/* We scissor here so that we don't have to clear the entire stencil
@@ -736,20 +736,20 @@ _prevent_overlapping_strokes (cairo_gl_context_t 		*ctx,
 	    _cairo_path_fixed_approximate_stroke_extents (path, style, ctm,
 							  &stroke_extents);
 	    _cairo_gl_scissor_to_rectangle (setup->dst, &stroke_extents);
-            glEnable (GL_SCISSOR_TEST);
+            ctx->dispatch.Enable (GL_SCISSOR_TEST);
             ctx->states_cache.scissor_test_enabled = TRUE;
 	}
-	glClearStencil (1);
-	glClear (GL_STENCIL_BUFFER_BIT);
+	ctx->dispatch.ClearStencil (1);
+	ctx->dispatch.Clear (GL_STENCIL_BUFFER_BIT);
 	_disable_scissor_buffer (ctx);
 
-	glStencilFunc (GL_EQUAL, 1, 1);
+	ctx->dispatch.StencilFunc (GL_EQUAL, 1, 1);
     }
 
     /* This means that once we draw to a particular pixel nothing else can
        be drawn there until the stencil buffer is reset or the stencil test
        is disabled. */
-    glStencilOp (GL_ZERO, GL_ZERO, GL_ZERO);
+    ctx->dispatch.StencilOp (GL_ZERO, GL_ZERO, GL_ZERO);
 
     _cairo_clip_destroy (setup->dst->clip_on_stencil_buffer);
     setup->dst->clip_on_stencil_buffer = NULL;
@@ -787,8 +787,8 @@ query_surface_capabilities (cairo_gl_surface_t *surface)
 
     _cairo_gl_context_set_destination (ctx, surface, FALSE);
 
-    glGetIntegerv(GL_SAMPLES, &samples);
-    glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+    ctx->dispatch.GetIntegerv(GL_SAMPLES, &samples);
+    ctx->dispatch.GetIntegerv(GL_STENCIL_BITS, &stencil_bits);
     surface->supports_stencil = stencil_bits > 0;
     surface->supports_msaa = samples > 1;
     surface->num_samples = samples;

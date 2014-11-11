@@ -222,14 +222,14 @@ _cairo_gl_texture_set_filter (cairo_gl_context_t *ctx,
     switch (filter) {
     case CAIRO_FILTER_FAST:
     case CAIRO_FILTER_NEAREST:
-	glTexParameteri (target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri (target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	break;
     case CAIRO_FILTER_GOOD:
     case CAIRO_FILTER_BEST:
     case CAIRO_FILTER_BILINEAR:
-	glTexParameteri (target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri (target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	break;
     default:
     case CAIRO_FILTER_GAUSSIAN:
@@ -275,8 +275,8 @@ _cairo_gl_texture_set_extend (cairo_gl_context_t *ctx,
     }
 
     if (likely (wrap_mode)) {
-	glTexParameteri (target, GL_TEXTURE_WRAP_S, wrap_mode);
-	glTexParameteri (target, GL_TEXTURE_WRAP_T, wrap_mode);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_WRAP_S, wrap_mode);
+	ctx->dispatch.TexParameteri (target, GL_TEXTURE_WRAP_T, wrap_mode);
     }
 }
 
@@ -326,10 +326,10 @@ _cairo_gl_context_setup_operand (cairo_gl_context_t *ctx,
 	break;
     case CAIRO_GL_OPERAND_TEXTURE:
         if (ctx->states_cache.active_texture != GL_TEXTURE0 + tex_unit) {
-	    glActiveTexture (GL_TEXTURE0 + tex_unit);
+	    dispatch->ActiveTexture (GL_TEXTURE0 + tex_unit);
 	    ctx->states_cache.active_texture = GL_TEXTURE0 + tex_unit;
         }
-        glBindTexture (ctx->tex_target, operand->texture.tex);
+        dispatch->BindTexture (ctx->tex_target, operand->texture.tex);
         _cairo_gl_texture_set_extend (ctx, ctx->tex_target,
                                       operand->texture.attributes.extend,
                                       operand->texture.use_atlas);
@@ -360,10 +360,10 @@ _cairo_gl_context_setup_operand (cairo_gl_context_t *ctx,
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE:
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT:
         if(ctx->states_cache.active_texture != GL_TEXTURE0 + tex_unit) {
-	    glActiveTexture (GL_TEXTURE0 + tex_unit);
+	    dispatch->ActiveTexture (GL_TEXTURE0 + tex_unit);
 	    ctx->states_cache.active_texture = GL_TEXTURE0 + tex_unit;
         }
-        glBindTexture (ctx->tex_target, operand->gradient.gradient->tex);
+        dispatch->BindTexture (ctx->tex_target, operand->gradient.gradient->tex);
         _cairo_gl_texture_set_extend (ctx, ctx->tex_target,
 				      operand->gradient.extend, FALSE);
         _cairo_gl_texture_set_filter (ctx, ctx->tex_target, CAIRO_FILTER_BILINEAR);
@@ -498,12 +498,12 @@ _cairo_gl_set_operator (cairo_gl_context_t *ctx,
     }
 
     if (ctx->current_target->base.content == CAIRO_CONTENT_ALPHA) {
-        /* cache glBlendFunc, src factor and dst factor, alpha factor */
+        /* cache BlendFunc, src factor and dst factor, alpha factor */
 	if (ctx->states_cache.src_color_factor != GL_ZERO ||
 	   ctx->states_cache.dst_color_factor != GL_ZERO ||
 	   ctx->states_cache.src_alpha_factor != src_factor ||
 	   ctx->states_cache.dst_alpha_factor != dst_factor) {
-	    glBlendFuncSeparate (GL_ZERO, GL_ZERO, src_factor, dst_factor);
+	    ctx->dispatch.BlendFuncSeparate (GL_ZERO, GL_ZERO, src_factor, dst_factor);
 	    ctx->states_cache.src_color_factor = GL_ZERO;
 	    ctx->states_cache.dst_color_factor = GL_ZERO;
 	    ctx->states_cache.src_alpha_factor = src_factor;
@@ -514,7 +514,7 @@ _cairo_gl_set_operator (cairo_gl_context_t *ctx,
 	    ctx->states_cache.dst_color_factor != dst_factor ||
 	    ctx->states_cache.src_alpha_factor != GL_ONE ||
 	    ctx->states_cache.dst_alpha_factor != GL_ONE) {
-	    glBlendFuncSeparate (src_factor, dst_factor, GL_ONE, GL_ONE);
+	    ctx->dispatch.BlendFuncSeparate (src_factor, dst_factor, GL_ONE, GL_ONE);
 	    ctx->states_cache.src_color_factor = src_factor;
 	    ctx->states_cache.dst_color_factor = dst_factor;
 	    ctx->states_cache.src_alpha_factor = GL_ONE;
@@ -523,7 +523,7 @@ _cairo_gl_set_operator (cairo_gl_context_t *ctx,
     } else {
         if (ctx->states_cache.src_color_factor != src_factor ||
 	    ctx->states_cache.dst_color_factor != dst_factor) {
-	    glBlendFunc (src_factor, dst_factor);
+	    ctx->dispatch.BlendFunc (src_factor, dst_factor);
 	    ctx->states_cache.src_color_factor = src_factor;
 	    ctx->states_cache.dst_color_factor = dst_factor;
         }
@@ -638,10 +638,12 @@ _scissor_to_doubles (cairo_gl_surface_t	*surface,
 {
     double height;
 
+    cairo_gl_context_t *ctx = (cairo_gl_context_t *) cairo_surface_get_device ((cairo_surface_t *) surface);
+
     height = y2 - y1;
     if (_cairo_gl_surface_is_texture (surface) == FALSE)
 	y1 = surface->height - (y1 + height);
-    glScissor (x1, y1, x2 - x1, height);
+    ctx->dispatch.Scissor (x1, y1, x2 - x1, height);
 }
 
 void
@@ -705,7 +707,7 @@ _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
 
     /* The clip is not rectangular, so use the stencil buffer. */
     if (! ctx->states_cache.depth_mask ) {
-	glDepthMask (GL_TRUE);
+	ctx->dispatch.DepthMask (GL_TRUE);
 	ctx->states_cache.depth_mask = TRUE;
     }
 
@@ -725,17 +727,17 @@ _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
 	}
     setup->dst->clip_on_stencil_buffer = _cairo_clip_copy (setup->clip);
 
-    glClearStencil (0);
-    glClear (GL_STENCIL_BUFFER_BIT);
+    ctx->dispatch.ClearStencil (0);
+    ctx->dispatch.Clear (GL_STENCIL_BUFFER_BIT);
 
-    glStencilOp (GL_REPLACE, GL_REPLACE, GL_REPLACE);
-    glStencilFunc (GL_EQUAL, 1, 0xffffffff);
-    glColorMask (0, 0, 0, 0);
+    ctx->dispatch.StencilOp (GL_REPLACE, GL_REPLACE, GL_REPLACE);
+    ctx->dispatch.StencilFunc (GL_EQUAL, 1, 0xffffffff);
+    ctx->dispatch.ColorMask (0, 0, 0, 0);
 
     status = _cairo_gl_msaa_compositor_draw_clip (ctx, setup, clip);
 
     if (unlikely (status)) {
-	glColorMask (1, 1, 1, 1);
+	ctx->dispatch.ColorMask (1, 1, 1, 1);
 	goto disable_stencil_buffer_and_return;
     }
 
@@ -746,9 +748,10 @@ _cairo_gl_composite_setup_painted_clipping (cairo_gl_composite_t *setup,
     _cairo_gl_composite_setup_vbo (ctx, vertex_size);
 
 activate_stencil_buffer_and_return:
-    glColorMask (1, 1, 1, 1);
-    glStencilOp (GL_KEEP, GL_KEEP, GL_KEEP);
-    glStencilFunc (GL_EQUAL, 1, 0xffffffff);
+    ctx->dispatch.ColorMask (1, 1, 1, 1);
+
+    ctx->dispatch.StencilOp (GL_KEEP, GL_KEEP, GL_KEEP);
+    ctx->dispatch.StencilFunc (GL_EQUAL, 1, 0xffffffff);
     return CAIRO_INT_STATUS_SUCCESS;
 
 disable_stencil_buffer_and_return:
@@ -899,7 +902,7 @@ _cairo_gl_composite_begin (cairo_gl_composite_t *setup,
     _cairo_gl_context_set_destination (ctx, setup->dst, setup->multisample);
 
     if (ctx->states_cache.blend_enabled == FALSE) {
-	glEnable (GL_BLEND);
+	ctx->dispatch.Enable (GL_BLEND);
 	ctx->states_cache.blend_enabled = TRUE;
     }
     
@@ -931,13 +934,13 @@ _cairo_gl_composite_draw_tristrip (cairo_gl_context_t *ctx)
 
 	_cairo_gl_set_shader (ctx, ctx->pre_shader);
 	_cairo_gl_set_operator (ctx, CAIRO_OPERATOR_DEST_OUT, TRUE);
-	glDrawElements (GL_TRIANGLE_STRIP, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
+	ctx->dispatch.DrawElements (GL_TRIANGLE_STRIP, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
 
 	_cairo_gl_set_shader (ctx, prev_shader);
 	_cairo_gl_set_operator (ctx, CAIRO_OPERATOR_ADD, TRUE);
     }
 
-    glDrawElements (GL_TRIANGLE_STRIP, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
+    ctx->dispatch.DrawElements (GL_TRIANGLE_STRIP, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
     _cairo_array_truncate (indices, 0);
 }
 
@@ -956,13 +959,13 @@ _cairo_gl_composite_draw_line (cairo_gl_context_t *ctx)
 
 	_cairo_gl_set_shader (ctx, ctx->pre_shader);
 	_cairo_gl_set_operator (ctx, CAIRO_OPERATOR_DEST_OUT, TRUE);
-	glDrawElements (type, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
+	ctx->dispatch.DrawElements (type, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
 
 	_cairo_gl_set_shader (ctx, prev_shader);
 	_cairo_gl_set_operator (ctx, CAIRO_OPERATOR_ADD, TRUE);
     }
 
-    glDrawElements (type, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
+    ctx->dispatch.DrawElements (type, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, indices_array);
     _cairo_array_truncate (indices, 0);
 }
 
@@ -971,17 +974,17 @@ _cairo_gl_composite_draw_triangles (cairo_gl_context_t *ctx,
 				    unsigned int count)
 {
     if (! ctx->pre_shader) {
-        glDrawArrays (GL_TRIANGLES, 0, count);
+        ctx->dispatch.DrawArrays (GL_TRIANGLES, 0, count);
     } else {
         cairo_gl_shader_t *prev_shader = ctx->current_shader;
 
         _cairo_gl_set_shader (ctx, ctx->pre_shader);
         _cairo_gl_set_operator (ctx, CAIRO_OPERATOR_DEST_OUT, TRUE);
-        glDrawArrays (GL_TRIANGLES, 0, count);
+        ctx->dispatch.DrawArrays (GL_TRIANGLES, 0, count);
 
         _cairo_gl_set_shader (ctx, prev_shader);
         _cairo_gl_set_operator (ctx, CAIRO_OPERATOR_ADD, TRUE);
-        glDrawArrays (GL_TRIANGLES, 0, count);
+        ctx->dispatch.DrawArrays (GL_TRIANGLES, 0, count);
     }
 }
 

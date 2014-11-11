@@ -172,10 +172,10 @@ _cairo_gl_context_init_shaders (cairo_gl_context_t *ctx)
 	"}\n";
     cairo_status_t status;
 
-    if (_cairo_gl_get_version () >= CAIRO_GL_VERSION_ENCODE (2, 0) ||
-	(_cairo_gl_has_extension ("GL_ARB_shader_objects") &&
-	 _cairo_gl_has_extension ("GL_ARB_fragment_shader") &&
-	 _cairo_gl_has_extension ("GL_ARB_vertex_shader"))) {
+    if (_cairo_gl_get_version (&ctx->dispatch) >= CAIRO_GL_VERSION_ENCODE (2, 0) ||
+	(_cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_shader_objects") &&
+	 _cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_fragment_shader") &&
+	 _cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_vertex_shader"))) {
 	ctx->has_shader_support = TRUE;
     } else {
 	ctx->has_shader_support = FALSE;
@@ -1086,7 +1086,7 @@ _cairo_gl_shader_set_samplers (cairo_gl_context_t *ctx,
      * asked for a different program while a shader is bound.  This shouldn't
      * be a performance issue, since this is only called once per compile.
      */
-    glGetIntegerv (GL_CURRENT_PROGRAM, &saved_program);
+    dispatch->GetIntegerv (GL_CURRENT_PROGRAM, &saved_program);
     dispatch->UseProgram (shader->program);
 
     location = dispatch->GetUniformLocation (shader->program, "source_sampler");

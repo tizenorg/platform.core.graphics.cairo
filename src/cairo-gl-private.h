@@ -335,6 +335,49 @@ typedef void (*cairo_gl_generic_func_t)(void);
 typedef cairo_gl_generic_func_t (*cairo_gl_get_proc_addr_func_t)(const char *procname);
 
 typedef struct _cairo_gl_dispatch {
+    /* common */
+    void (*ActiveTexture) (GLenum texture);
+    void (*BindTexture) (GLenum target, GLuint texture);
+    void (*BlendFunc) (GLenum sfactor, GLenum dfactor);
+    void (*BlendFuncSeparate) (GLenum srcRGB, GLenum dstRGB,
+			       GLenum srcAlpha, GLenum dstAlpha);
+    void (*Clear) (GLbitfield mask);
+    void (*ClearColor) (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+    void (*ClearStencil) (GLint s);
+    void (*ColorMask) (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
+    void (*DeleteTextures) (GLsizei n, const GLuint *textures);
+    void (*DepthMask) (GLboolean flag);
+    void (*Disable) (GLenum cap);
+    void (*DrawArrays) (GLenum mode, GLint first, GLsizei count);
+    void (*DrawElements) (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
+    void (*Enable) (GLenum cap);
+    void (*GenTextures) (GLsizei n, GLuint *textures);
+    void (*GetBooleanv) (GLenum pname, GLboolean *data);
+    GLenum (*GetError) (void);
+    void (*GetFloatv) (GLenum pname, GLfloat *data);
+    void (*GetIntegerv) (GLenum pname, GLint *data);
+    const GLubyte *(*GetString) (GLenum pname);
+    void (*PixelStorei) (GLenum pname, GLint param);
+    void (*ReadPixels) (GLint x, GLint y, GLsizei width, GLsizei height,
+			GLenum format, GLenum type, GLvoid *data);
+    void (*Scissor) (GLint x, GLint y, GLsizei width, GLsizei height);
+    void (*StencilFunc) (GLenum func, GLint ref, GLuint mask);
+    void (*StencilMask) (GLuint mask);
+    void (*StencilOp) (GLenum sfail, GLenum dpfail, GLenum dppass);
+    void (*TexSubImage2D) (GLenum target, GLint level,
+			   GLint xoffset, GLint yoffset,
+			   GLsizei width, GLsizei height,
+			   GLenum format, GLenum type, const GLvoid *data);
+    void (*TexImage2D) (GLenum target, GLint level, GLenum internalformat,
+			GLsizei width, GLsizei height,
+			GLint border, GLenum format,
+			GLenum type, const GLvoid *data);
+    void (*TexParameteri) (GLenum target, GLenum pname, GLint param);
+#if CAIRO_HAS_GL_SURFACE
+    void (*DrawBuffer) (GLenum buf);
+    void (*ReadBuffer) (GLenum buf);
+#endif
+
     /* Buffers */
     void (*GenBuffers) (GLsizei n, GLuint *buffers);
     void (*BindBuffer) (GLenum target, GLuint buffer);
@@ -523,12 +566,12 @@ typedef struct _cairo_gl_font {
 } cairo_gl_font_t;
 
 static cairo_always_inline GLenum
-_cairo_gl_get_error (void)
+_cairo_gl_get_error (cairo_gl_context_t *ctx)
 {
-    GLenum err = glGetError();
+    GLenum err = ctx->dispatch.GetError();
 
     if (unlikely (err))
-        while (glGetError ());
+        while (ctx->dispatch.GetError ());
 
     return err;
 }
@@ -591,7 +634,7 @@ _cairo_gl_context_acquire (cairo_device_t *device,
 	return status;
 
     /* clear potential previous GL errors */
-    _cairo_gl_get_error ();
+    _cairo_gl_get_error ((cairo_gl_context_t *) device);
 
     *ctx = (cairo_gl_context_t *) device;
     return CAIRO_STATUS_SUCCESS;
@@ -602,7 +645,7 @@ _cairo_gl_context_release (cairo_gl_context_t *ctx, cairo_status_t status)
 {
     GLenum err;
 
-    err = _cairo_gl_get_error ();
+    err = _cairo_gl_get_error (ctx);
 
     if (unlikely (err)) {
         cairo_status_t new_status;
@@ -655,7 +698,7 @@ static cairo_always_inline void
 _disable_stencil_buffer (cairo_gl_context_t *ctx)
 {
     if (ctx->states_cache.stencil_test_enabled == TRUE) {
-        glDisable (GL_STENCIL_TEST);
+        ctx->dispatch.Disable (GL_STENCIL_TEST);
         ctx->states_cache.stencil_test_enabled = FALSE;
     }
 }
@@ -664,7 +707,7 @@ static cairo_always_inline void
 _disable_scissor_buffer (cairo_gl_context_t *ctx)
 {
     if (ctx->states_cache.scissor_test_enabled == TRUE) {
-        glDisable (GL_SCISSOR_TEST);
+        ctx->dispatch.Disable (GL_SCISSOR_TEST);
         ctx->states_cache.scissor_test_enabled = FALSE;
     }
 }
@@ -673,7 +716,7 @@ static cairo_always_inline void
 _enable_stencil_buffer (cairo_gl_context_t *ctx)
 {
     if (ctx->states_cache.stencil_test_enabled == FALSE) {
-        glEnable (GL_STENCIL_TEST);
+        ctx->dispatch.Enable (GL_STENCIL_TEST);
         ctx->states_cache.stencil_test_enabled = TRUE;
     }
 }
@@ -682,7 +725,7 @@ static cairo_always_inline void
 _enable_scissor_buffer (cairo_gl_context_t *ctx)
 {
     if (ctx->states_cache.scissor_test_enabled == FALSE) {
-        glEnable (GL_SCISSOR_TEST);
+        ctx->dispatch.Enable (GL_SCISSOR_TEST);
         ctx->states_cache.scissor_test_enabled = TRUE;
     }
 }
@@ -872,16 +915,16 @@ cairo_private void
 _cairo_gl_shader_fini (cairo_gl_context_t *ctx, cairo_gl_shader_t *shader);
 
 cairo_private int
-_cairo_gl_get_version (void);
+_cairo_gl_get_version (cairo_gl_dispatch_t *dispatch);
 
 cairo_private cairo_gl_flavor_t
-_cairo_gl_get_flavor (void);
+_cairo_gl_get_flavor (cairo_gl_dispatch_t *dispatch);
 
 cairo_private unsigned long
 _cairo_gl_get_vbo_size (void);
 
 cairo_private cairo_bool_t
-_cairo_gl_has_extension (const char *ext);
+_cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext);
 
 cairo_private cairo_status_t
 _cairo_gl_dispatch_init(cairo_gl_dispatch_t *dispatch,

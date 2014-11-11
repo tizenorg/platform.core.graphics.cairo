@@ -47,6 +47,9 @@ typedef struct _cairo_gl_dispatch_entry {
     size_t offset;
 } cairo_gl_dispatch_entry_t;
 
+#define DISPATCH_ENTRY_CORE(name) { { "gl"#name, "gl"#name"", "gl"#name }, \
+				   offsetof(cairo_gl_dispatch_t, name) }
+
 #define DISPATCH_ENTRY_ARB(name) { { "gl"#name, "gl"#name"ARB", "gl"#name }, \
 				   offsetof(cairo_gl_dispatch_t, name) }
 #define DISPATCH_ENTRY_EXT(name) { { "gl"#name, "gl"#name"EXT", "gl"#name }, \
@@ -58,6 +61,44 @@ typedef struct _cairo_gl_dispatch_entry {
 #define DISPATCH_ENTRY_CUSTOM(name, name2) { { "gl"#name, "gl"#name2, "gl"#name }, \
 			                     offsetof(cairo_gl_dispatch_t, name)}
 #define DISPATCH_ENTRY_LAST { { NULL, NULL, NULL }, 0 }
+
+cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
+    DISPATCH_ENTRY_CORE	(ActiveTexture),
+    DISPATCH_ENTRY_CORE	(BindTexture),
+    DISPATCH_ENTRY_CORE	(BlendFunc),
+    DISPATCH_ENTRY_CORE	(BlendFuncSeparate),
+    DISPATCH_ENTRY_CORE	(Clear),
+    DISPATCH_ENTRY_CORE	(ClearColor),
+    DISPATCH_ENTRY_CORE	(ClearStencil),
+    DISPATCH_ENTRY_CORE	(ColorMask),
+    DISPATCH_ENTRY_CORE	(DeleteTextures),
+    DISPATCH_ENTRY_CORE	(DepthMask),
+    DISPATCH_ENTRY_CORE	(Disable),
+    DISPATCH_ENTRY_CORE	(DrawArrays),
+    DISPATCH_ENTRY_CORE	(DrawElements),
+    DISPATCH_ENTRY_CORE	(Enable),
+    DISPATCH_ENTRY_CORE	(GenTextures),
+    DISPATCH_ENTRY_CORE	(GetBooleanv),
+    DISPATCH_ENTRY_CORE	(GetError),
+    DISPATCH_ENTRY_CORE	(GetFloatv),
+    DISPATCH_ENTRY_CORE	(GetIntegerv),
+    DISPATCH_ENTRY_CORE	(GetString),
+    DISPATCH_ENTRY_CORE	(PixelStorei),
+    DISPATCH_ENTRY_CORE	(ReadPixels),
+    DISPATCH_ENTRY_CORE	(Scissor),
+    DISPATCH_ENTRY_CORE	(StencilFunc),
+    DISPATCH_ENTRY_CORE	(StencilMask),
+    DISPATCH_ENTRY_CORE	(StencilOp),
+    DISPATCH_ENTRY_CORE	(TexSubImage2D),
+    DISPATCH_ENTRY_CORE	(TexImage2D),
+    DISPATCH_ENTRY_CORE	(TexParameteri),
+#if defined(CAIRO_HAS_GL_SURFACE) || defined(CAIRO_HAS_EVASGL_SURFACE)
+    DISPATCH_ENTRY_CORE	(DrawBuffer),
+    DISPATCH_ENTRY_CORE	(ReadBuffer),
+#endif
+    DISPATCH_ENTRY_CORE	(DepthMask),
+    DISPATCH_ENTRY_LAST
+};
 
 cairo_private cairo_gl_dispatch_entry_t dispatch_buffers_entries[] = {
     DISPATCH_ENTRY_ARB     (GenBuffers),

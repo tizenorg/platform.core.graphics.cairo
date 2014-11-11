@@ -34,11 +34,10 @@
 
 #include <errno.h>
 
-int
-_cairo_gl_get_version (void)
+int _cairo_gl_get_version (cairo_gl_dispatch_t *dispatch)
 {
     int major, minor;
-    const char *version = (const char *) glGetString (GL_VERSION);
+    const char *version = (const char *) dispatch->GetString (GL_VERSION);
     const char *dot = version == NULL ? NULL : strchr (version, '.');
     const char *major_start = dot;
 
@@ -58,9 +57,9 @@ _cairo_gl_get_version (void)
 }
 
 cairo_gl_flavor_t
-_cairo_gl_get_flavor (void)
+_cairo_gl_get_flavor (cairo_gl_dispatch_t *dispatch)
 {
-    const char *version = (const char *) glGetString (GL_VERSION);
+    const char *version = (const char *) dispatch->GetString (GL_VERSION);
     cairo_gl_flavor_t flavor;
 
     if (version == NULL)
@@ -100,9 +99,9 @@ _cairo_gl_get_vbo_size (void)
 }
 
 cairo_bool_t
-_cairo_gl_has_extension (const char *ext)
+_cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext)
 {
-    const char *extensions = (const char *) glGetString (GL_EXTENSIONS);
+    const char *extensions = (const char *) dispatch->GetString (GL_EXTENSIONS);
     size_t len = strlen (ext);
     const char *ext_ptr = extensions;
 

@@ -119,7 +119,7 @@ _cairo_gl_dispatch_init_buffers (cairo_gl_dispatch_t *dispatch,
     {
 	if (gl_version >= CAIRO_GL_VERSION_ENCODE (1, 5))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_CORE;
-	else if (_cairo_gl_has_extension ("GL_ARB_vertex_buffer_object"))
+	else if (_cairo_gl_has_extension (dispatch, "GL_ARB_vertex_buffer_object"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_EXT;
 	else
 	    return CAIRO_STATUS_DEVICE_ERROR;
@@ -144,6 +144,17 @@ _cairo_gl_dispatch_init_buffers (cairo_gl_dispatch_t *dispatch,
     return CAIRO_STATUS_SUCCESS;
 }
 
+static void
+_cairo_gl_dispatch_init_core (cairo_gl_dispatch_t *dispatch,
+			      cairo_gl_get_proc_addr_func_t get_proc_addr)
+{
+    cairo_gl_dispatch_name_t dispatch_name = CAIRO_GL_DISPATCH_NAME_CORE;
+
+    _cairo_gl_dispatch_init_entries (dispatch, get_proc_addr,
+				     dispatch_core_entries, dispatch_name);
+
+}
+
 static cairo_status_t
 _cairo_gl_dispatch_init_shaders (cairo_gl_dispatch_t *dispatch,
 				 cairo_gl_get_proc_addr_func_t get_proc_addr,
@@ -155,7 +166,7 @@ _cairo_gl_dispatch_init_shaders (cairo_gl_dispatch_t *dispatch,
     {
 	if (gl_version >= CAIRO_GL_VERSION_ENCODE (2, 0))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_CORE;
-	else if (_cairo_gl_has_extension ("GL_ARB_shader_objects"))
+	else if (_cairo_gl_has_extension (dispatch, "GL_ARB_shader_objects"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_EXT;
 	else
 	    return CAIRO_STATUS_DEVICE_ERROR;
@@ -190,9 +201,9 @@ _cairo_gl_dispatch_init_fbo (cairo_gl_dispatch_t *dispatch,
     if (gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
     {
 	if (gl_version >= CAIRO_GL_VERSION_ENCODE (3, 0) ||
-	    _cairo_gl_has_extension ("GL_ARB_framebuffer_object"))
+	    _cairo_gl_has_extension (dispatch, "GL_ARB_framebuffer_object"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_CORE;
-	else if (_cairo_gl_has_extension ("GL_EXT_framebuffer_object"))
+	else if (_cairo_gl_has_extension (dispatch, "GL_EXT_framebuffer_object"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_EXT;
 	else
 	    return CAIRO_STATUS_DEVICE_ERROR;
@@ -227,9 +238,9 @@ _cairo_gl_dispatch_init_multisampling (cairo_gl_dispatch_t *dispatch,
      * extension, so we put one in the EXT slot and one in the real ES slot.*/
     cairo_gl_dispatch_name_t dispatch_name = CAIRO_GL_DISPATCH_NAME_CORE;
     if (gl_flavor == CAIRO_GL_FLAVOR_ES2) {
-	if (_cairo_gl_has_extension ("GL_EXT_multisampled_render_to_texture"))
+	if (_cairo_gl_has_extension (dispatch, "GL_EXT_multisampled_render_to_texture"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_EXT;
-	else if (_cairo_gl_has_extension ("GL_IMG_multisampled_render_to_texture"))
+	else if (_cairo_gl_has_extension (dispatch, "GL_IMG_multisampled_render_to_texture"))
 	    dispatch_name = CAIRO_GL_DISPATCH_NAME_ES;
     }
     _cairo_gl_dispatch_init_entries (dispatch, get_proc_addr,
@@ -246,8 +257,10 @@ _cairo_gl_dispatch_init (cairo_gl_dispatch_t *dispatch,
     int gl_version;
     cairo_gl_flavor_t gl_flavor;
 
-    gl_version = _cairo_gl_get_version ();
-    gl_flavor = _cairo_gl_get_flavor ();
+    _cairo_gl_dispatch_init_core (dispatch, get_proc_addr);
+    gl_version = _cairo_gl_get_version (dispatch);
+    gl_flavor = _cairo_gl_get_flavor (dispatch);
+
 
     status = _cairo_gl_dispatch_init_buffers (dispatch, get_proc_addr,
 					      gl_version, gl_flavor);

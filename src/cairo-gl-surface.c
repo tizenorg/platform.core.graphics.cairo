@@ -443,9 +443,9 @@ _cairo_gl_surface_create_scratch_for_texture (cairo_gl_context_t   *ctx,
 
     /* Create the texture used to store the surface's data. */
     _cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
-    glBindTexture (ctx->tex_target, surface->tex);
-    glTexParameteri (ctx->tex_target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri (ctx->tex_target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    ctx->dispatch.BindTexture (ctx->tex_target, surface->tex);
+    ctx->dispatch.TexParameteri (ctx->tex_target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    ctx->dispatch.TexParameteri (ctx->tex_target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     return &surface->base;
 }
@@ -461,7 +461,7 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
     GLenum format;
     GLuint tex;
 
-    glGenTextures (1, &tex);
+    ctx->dispatch.GenTextures (1, &tex);
     surface = (cairo_gl_surface_t *)
 	_cairo_gl_surface_create_scratch_for_texture (ctx, content,
 						      tex, width, height);
@@ -504,8 +504,9 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
 	break;
     }
 
-    glTexImage2D (ctx->tex_target, 0, format, width, height, 0,
-		  format, GL_UNSIGNED_BYTE, NULL);
+    ctx->dispatch.TexImage2D (ctx->tex_target, 0, format,
+			      width, height, 0,
+			      format, GL_UNSIGNED_BYTE, NULL);
 
     return &surface->base;
 }
@@ -568,15 +569,15 @@ _cairo_gl_surface_clear (cairo_gl_surface_t  *surface,
 	ctx->states_cache.clear_blue = b;
 	ctx->states_cache.clear_alpha = a;
 
-	glClearColor (r, g, b, a);
+	ctx->dispatch.ClearColor (r, g, b, a);
     }
 
     /* optimize for mobile gl driver with deferred rendering */
     if (surface->clip_on_stencil_buffer ||
 	ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
-	glClear (GL_COLOR_BUFFER_BIT);
+	ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT);
     else
-	glClear (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (a == 0)
 	surface->base.is_clear = TRUE;
@@ -863,7 +864,7 @@ _cairo_gl_surface_fill_alpha_channel (cairo_gl_surface_t *dst,
     cairo_status_t status;
 
     _cairo_gl_composite_flush (ctx);
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+    ctx->dispatch.ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
 
     status = _cairo_gl_composite_init (&setup, CAIRO_OPERATOR_SOURCE,
 				       dst, FALSE);
@@ -884,7 +885,7 @@ _cairo_gl_surface_fill_alpha_channel (cairo_gl_surface_t *dst,
     _cairo_gl_composite_fini (&setup);
 
     _cairo_gl_composite_flush (ctx);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    ctx->dispatch.ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
     return status;
 }
@@ -909,8 +910,8 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
     if (unlikely (status))
 	return status;
 
-    if (_cairo_gl_get_flavor () == CAIRO_GL_FLAVOR_ES2 ||
-	_cairo_gl_get_flavor () == CAIRO_GL_FLAVOR_ES3) {
+    if (_cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES2 ||
+	_cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES3) {
 	pixman_format_code_t pixman_format;
 	cairo_surface_pattern_t pattern;
 	cairo_bool_t require_conversion = FALSE;
@@ -1003,7 +1004,7 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	     (src->width * cpp < src->stride - 3 ||
 	      width != src->width)))
 	{
-	    glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, 1);
 	    status = _cairo_gl_surface_extract_image_data (src, src_x, src_y,
 							   width, height,
 							   &data_start_gles2);
@@ -1014,10 +1015,10 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	}
 	else
 	{
-	    glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
+	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, 4);
 	    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
 		ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
-		glPixelStorei (GL_UNPACK_ROW_LENGTH, src->stride / cpp);
+		ctx->dispatch.PixelStorei (GL_UNPACK_ROW_LENGTH, src->stride / cpp);
 	}
 
 	/* we must resolve the renderbuffer to texture before we
@@ -1029,12 +1030,12 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	}
 
         _cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
-	glBindTexture (ctx->tex_target, dst->tex);
-	glTexParameteri (ctx->tex_target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri (ctx->tex_target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexSubImage2D (ctx->tex_target, 0,
-			 dst_x, dst_y, width, height,
-			 format, type, data_start);
+	ctx->dispatch.BindTexture (ctx->tex_target, dst->tex);
+	ctx->dispatch.TexParameteri (ctx->tex_target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	ctx->dispatch.TexParameteri (ctx->tex_target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	ctx->dispatch.TexSubImage2D (ctx->tex_target, 0,
+				     dst_x, dst_y, width, height,
+				     format, type, data_start);
 
 	free (data_start_gles2);
 
@@ -1139,7 +1140,7 @@ _cairo_gl_surface_finish (void *abstract_surface)
     if (surface->depth_stencil)
         ctx->dispatch.DeleteRenderbuffers (1, &surface->depth_stencil);
     if (surface->owns_tex)
-	glDeleteTextures (1, &surface->tex);
+	ctx->dispatch.DeleteTextures (1, &surface->tex);
 
     if (surface->msaa_depth_stencil)
 	ctx->dispatch.DeleteRenderbuffers (1, &surface->msaa_depth_stencil);
@@ -1273,22 +1274,22 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
     flipped = ! _cairo_gl_surface_is_texture (surface);
     mesa_invert = flipped && ctx->has_mesa_pack_invert;
 
-    glPixelStorei (GL_PACK_ALIGNMENT, 4);
+    ctx->dispatch.PixelStorei (GL_PACK_ALIGNMENT, 4);
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
 	ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
-	glPixelStorei (GL_PACK_ROW_LENGTH, image->stride / cpp);
+	ctx->dispatch.PixelStorei (GL_PACK_ROW_LENGTH, image->stride / cpp);
     if (mesa_invert)
-	glPixelStorei (GL_PACK_INVERT_MESA, 1);
+	ctx->dispatch.PixelStorei (GL_PACK_INVERT_MESA, 1);
 
     y = extents->y;
     if (flipped)
 	y = surface->height - extents->y - extents->height;
 
-    glReadPixels (extents->x, y,
-		  extents->width, extents->height,
-		  format, type, image->data);
+    ctx->dispatch.ReadPixels (extents->x, y,
+			      extents->width, extents->height,
+			      format, type, image->data);
     if (mesa_invert)
-	glPixelStorei (GL_PACK_INVERT_MESA, 0);
+	ctx->dispatch.PixelStorei (GL_PACK_INVERT_MESA, 0);
 
     status = _cairo_gl_context_release (ctx, status);
     if (unlikely (status)) {
