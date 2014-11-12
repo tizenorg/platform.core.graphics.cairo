@@ -722,7 +722,7 @@ _prevent_overlapping_strokes (cairo_gl_context_t 		*ctx,
 	   so we can use it below to prevent overlapping shapes. We initialize
 	   it all to one here which represents infinite clip. */
 	if (! ctx->states_cache.depth_mask) {
-	    glDepthMask (GL_TRUE);
+	    ctx->dispatch.DepthMask (GL_TRUE);
 	    ctx->states_cache.depth_mask = TRUE;
 	}
 	ctx->dispatch.Enable (GL_STENCIL_TEST);

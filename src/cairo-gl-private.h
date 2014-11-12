@@ -355,6 +355,7 @@ typedef struct _cairo_gl_dispatch {
     void (*ClearStencil) (GLint s);
     void (*ColorMask) (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
     void (*DeleteTextures) (GLsizei n, const GLuint *textures);
+    void (*DepthMask) (GLboolean flag);
     void (*Disable) (GLenum cap);
     void (*DrawArrays) (GLenum mode, GLint first, GLsizei count);
     void (*DrawElements) (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
@@ -386,6 +387,7 @@ typedef struct _cairo_gl_dispatch {
     void (*DrawBuffer) (GLenum buf);
     void (*ReadBuffer) (GLenum buf);
 #endif
+    void (*Viewport) (GLint x, GLint y, GLsizei width, GLsizei height);
 
     /* Buffers */
     void (*GenBuffers) (GLsizei n, GLuint *buffers);

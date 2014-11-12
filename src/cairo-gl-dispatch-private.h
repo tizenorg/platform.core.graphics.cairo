@@ -96,7 +96,8 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(DrawBuffer),
     DISPATCH_ENTRY_CORE	(ReadBuffer),
 #endif
-    //DISPATCH_ENTRY_CORE	(DepthMask),
+    DISPATCH_ENTRY_CORE	(DepthMask),
+    DISPATCH_ENTRY_CORE	(Viewport),
     DISPATCH_ENTRY_LAST
 };
 

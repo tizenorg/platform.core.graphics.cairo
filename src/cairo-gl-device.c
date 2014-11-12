@@ -981,7 +981,7 @@ _cairo_gl_context_set_destination (cairo_gl_context_t *ctx,
     ctx->dispatch.Disable (GL_DITHER);
     if (ctx->states_cache.viewport_box.width != surface->width ||
 	ctx->states_cache.viewport_box.height != surface->height) {
-	glViewport (0, 0, surface->width, surface->height);
+	ctx->dispatch.Viewport (0, 0, surface->width, surface->height);
 	ctx->states_cache.viewport_box.width = surface->width;
 	ctx->states_cache.viewport_box.height = surface->height;
     }
