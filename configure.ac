@@ -366,7 +366,7 @@ CAIRO_ENABLE_SURFACE_BACKEND(gl, OpenGL, no, [
 
 dnl ===========================================================================
 CAIRO_ENABLE_SURFACE_BACKEND(evasgl, EvasGL, no, [
-  evasgl_REQUIRES="evas"
+  evasgl_REQUIRES="evas ecore ecore-evas"
   PKG_CHECK_MODULES(evasgl, $evasgl_REQUIRES,, [
 	  dnl Fallback to searching for headers
 	  AC_CHECK_HEADER(evas-1/Evas_GL.h,, [use_evasgl="no (evas.pc nor EvasGL headers not found)"])
