@@ -1028,4 +1028,6 @@ void _cairo_gl_context_reset (cairo_gl_context_t *ctx)
 
     /* FIXME:  this is hack to fix mali driver */
     ctx->dispatch.Disable (GL_DITHER);
+
+    ctx->current_shader = NULL;
 }
