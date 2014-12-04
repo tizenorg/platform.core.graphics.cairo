@@ -206,6 +206,51 @@ _glx_dummy_window (Display *dpy, GLXContext gl_ctx, Window *dummy)
 static cairo_gl_generic_func_t
 _cairo_glx_get_proc_address (void *data, const char *name)
 {
+    int i;
+    struct {
+	cairo_gl_generic_func_t func;
+	const char *name;
+    } func_map[] = {
+    { (cairo_gl_generic_func_t)glActiveTexture,	"glActiveTexture"	},
+    { (cairo_gl_generic_func_t)glBindTexture,	"glBindTexture"		},
+    { (cairo_gl_generic_func_t)glBlendFunc,	"glBlendFunc"		},
+    { (cairo_gl_generic_func_t)glBlendFuncSeparate,"glBlendFuncSeparate"},
+    { (cairo_gl_generic_func_t)glClear,		"glClear"		},
+    { (cairo_gl_generic_func_t)glClearColor,	"glClearColor"		},
+    { (cairo_gl_generic_func_t)glClearStencil,	"glClearStencil"	},
+    { (cairo_gl_generic_func_t)glColorMask,	"glColorMask"		},
+    { (cairo_gl_generic_func_t)glDeleteTextures,"glDeleteTextures"	},
+    { (cairo_gl_generic_func_t)glDepthMask,	"glDepthMask"		},
+    { (cairo_gl_generic_func_t)glDisable,	"glDisable"		},
+    { (cairo_gl_generic_func_t)glDrawArrays,	"glDrawArrays"		},
+    { (cairo_gl_generic_func_t)glDrawBuffer,	"glDrawBuffer"		},
+    { (cairo_gl_generic_func_t)glDrawElements,	"glDrawElements"	},
+    { (cairo_gl_generic_func_t)glEnable,	"glEnable"		},
+    { (cairo_gl_generic_func_t)glGenTextures,	"glGenTextures"		},
+    { (cairo_gl_generic_func_t)glGetBooleanv,	"glGetBooleanv"		},
+    { (cairo_gl_generic_func_t)glGetError,	"glGetError"		},
+    { (cairo_gl_generic_func_t)glGetFloatv,	"glGetFloatv"		},
+    { (cairo_gl_generic_func_t)glGetIntegerv,	"glGetIntegerv"		},
+    { (cairo_gl_generic_func_t)glGetString,	"glGetString"		},
+    { (cairo_gl_generic_func_t)glPixelStorei,	"glPixelStorei"		},
+    { (cairo_gl_generic_func_t)glReadBuffer,	"glReadBuffer"		},
+    { (cairo_gl_generic_func_t)glReadPixels,	"glReadPixels"		},
+    { (cairo_gl_generic_func_t)glScissor,	"glScissor"		},
+    { (cairo_gl_generic_func_t)glStencilFunc,	"glStencilFunc"		},
+    { (cairo_gl_generic_func_t)glStencilMask,	"glStencilMask"		},
+    { (cairo_gl_generic_func_t)glStencilOp,	"glStencilOp"		},
+    { (cairo_gl_generic_func_t)glTexImage2D,	"glTexImage2D"		},
+    { (cairo_gl_generic_func_t)glTexSubImage2D,	"glTexSubImage2D"	},
+    { (cairo_gl_generic_func_t)glTexParameteri,	"glTexParameteri"	},
+    { (cairo_gl_generic_func_t)glViewport,	"glViewport"		},
+    { NULL,					 NULL			}
+    };
+
+    for (i = 0; func_map[i].name; i++) {
+	if (! strcmp (func_map[i].name, name))
+	    return func_map[i].func;
+    }
+
     return glXGetProcAddress (name);
 }
 
