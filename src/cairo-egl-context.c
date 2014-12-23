@@ -42,6 +42,48 @@
 
 #include "cairo-error-private.h"
 
+#if CAIRO_HAS_EVASGL_SURFACE && CAIRO_HAS_GLESV2_SURFACE
+extern void glActiveTexture (GLenum texture);
+extern void glBindTexture (GLenum target, GLuint texture);
+extern void glBlendFunc (GLenum sfactor, GLenum dfactor);
+extern void glBlendFuncSeparate (GLenum srcRGB, GLenum dstRGB,
+			         GLenum srcAlpha, GLenum dstAlpha);
+extern void glClear (GLbitfield mask);
+extern void glClearColor (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+extern void glClearStencil (GLint s);
+extern void glColorMask (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
+extern void glDeleteTextures (GLsizei n, const GLuint *textures);
+extern void glDepthMask (GLboolean flag);
+extern void glDisable (GLenum cap);
+extern void glDrawArrays (GLenum mode, GLint first, GLsizei count);
+extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
+extern void glEnable (GLenum cap);
+extern void glFlush (void);
+extern void glGenTextures (GLsizei n, GLuint *textures);
+extern void glGetBooleanv (GLenum pname, GLboolean *data);
+extern GLenum glGetError (void);
+extern void glGetFloatv (GLenum pname, GLfloat *data);
+extern void glGetIntegerv (GLenum pname, GLint *data);
+extern const unsigned char* glGetString (GLenum pname);
+extern void glPixelStorei (GLenum pname, GLint param);
+extern void glReadPixels (GLint x, GLint y, GLsizei width, GLsizei height,
+			  GLenum format, GLenum type, GLvoid *data);
+extern void glScissor (GLint x, GLint y, GLsizei width, GLsizei height);
+extern void glStencilFunc (GLenum func, GLint ref, GLuint mask);
+extern void glStencilMask (GLuint mask);
+extern void glStencilOp (GLenum sfail, GLenum dpfail, GLenum dppass);
+extern void glTexSubImage2D (GLenum target, GLint level,
+			     GLint xoffset, GLint yoffset,
+			     GLsizei width, GLsizei height,
+			     GLenum format, GLenum type, const GLvoid *data);
+extern void glTexImage2D (GLenum target, GLint level, GLenum internalformat,
+			  GLsizei width, GLsizei height,
+			  GLint border, GLenum format,
+			  GLenum type, const GLvoid *data);
+extern void glTexParameteri (GLenum target, GLenum pname, GLint param);
+extern void glViewport (GLint x, GLint y, GLsizei width, GLsizei height);
+#endif
+
 typedef struct _cairo_egl_context {
     cairo_gl_context_t base;
 

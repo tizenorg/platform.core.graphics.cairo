@@ -32,6 +32,10 @@
 
 #include "cairo-boilerplate-private.h"
 
+#if CAIRO_HAS_EVASGL_SURFACE && CAIRO_HAS_GLESV2_SURFACE
+extern void glFinish (void);
+#endif
+
 #include <cairo-gl.h>
 #if CAIRO_HAS_GL_SURFACE
 #include <GL/gl.h>
