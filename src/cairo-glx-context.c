@@ -232,6 +232,7 @@ _cairo_glx_get_proc_address (void *data, const char *name)
     { (cairo_gl_generic_func_t)glGetFloatv,	"glGetFloatv"		},
     { (cairo_gl_generic_func_t)glGetIntegerv,	"glGetIntegerv"		},
     { (cairo_gl_generic_func_t)glGetString,	"glGetString"		},
+    { (cairo_gl_generic_func_t)glFlush,		"glFlush"		},
     { (cairo_gl_generic_func_t)glPixelStorei,	"glPixelStorei"		},
     { (cairo_gl_generic_func_t)glReadBuffer,	"glReadBuffer"		},
     { (cairo_gl_generic_func_t)glReadPixels,	"glReadPixels"		},
