@@ -918,15 +918,11 @@ AC_CONFIG_FILES([
 Makefile
 boilerplate/Makefile
 src/Makefile
-test/Makefile
-test/pdiff/Makefile
 util/Makefile
 util/cairo-gobject/Makefile
 util/cairo-missing/Makefile
 util/cairo-script/Makefile
 util/cairo-script/examples/Makefile
-doc/Makefile
-doc/public/Makefile
 ])
 AC_CONFIG_COMMANDS([cairo-trace],
 		   [chmod a+x util/cairo-trace/cairo-trace])
