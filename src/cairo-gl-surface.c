@@ -573,11 +573,15 @@ _cairo_gl_surface_clear (cairo_gl_surface_t  *surface,
     }
 
     /* optimize for mobile gl driver with deferred rendering */
-    if (surface->clip_on_stencil_buffer ||
-	ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
 	ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT);
-    else
+    else {
+	if (surface->clip_on_stencil_buffer) {
+	    _cairo_clip_destroy (surface->clip_on_stencil_buffer);
+	    surface->clip_on_stencil_buffer = NULL;
+	}
 	ctx->dispatch.Clear (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
 
     if (a == 0)
 	surface->base.is_clear = TRUE;
