@@ -2244,6 +2244,9 @@ _cairo_ft_scaled_glyph_init (void			*abstract_font,
      * color glyphs.  As such, this is currently disabled.
      */
     /* load_flags |= FT_LOAD_COLOR; */
+    
+    /* Color-glyph support */
+    load_flags |= FT_LOAD_COLOR;
 #endif
 
     error = FT_Load_Glyph (face,
