@@ -339,36 +339,33 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
     if (is_gles && ctx->has_packed_depth_stencil &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_EXT_multisampled_render_to_texture")) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES_EXT, &ctx->num_samples);
-	if (ctx->num_samples > 1)
-            ctx->msaa_type = CAIRO_GL_EXT_MULTISAMPLE_TO_TEXTURE;
+        ctx->msaa_type = CAIRO_GL_EXT_MULTISAMPLE_TO_TEXTURE;
     }
 #endif
 
 #if (CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_EVASGL_SURFACE) && GL_MAX_SAMPLES_IMG
-    if (ctx->num_samples == 1 &&
+    if (ctx->msaa_type == CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE &&
 	is_gles &&
 	ctx->has_packed_depth_stencil &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_IMG_multisampled_render_to_texture")) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES_IMG, &ctx->num_samples);
-	if (ctx->num_samples > 1)
-            ctx->msaa_type = CAIRO_GL_IMG_MULTISAMPLE_TO_TEXTURE;
+        ctx->msaa_type = CAIRO_GL_IMG_MULTISAMPLE_TO_TEXTURE;
     }
 #endif
 
 #if (CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_EVASGL_SURFACE) && GL_MAX_SAMPLES_ANGLE
-    if (ctx->num_samples == 1 &&
+    if (ctx->msaa_type == CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE &&
 	is_gles &&
 	ctx->has_packed_depth_stencil &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_ANGLE_framebuffer_blit") &&
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_ANGLE_framebuffer_multisample")) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES_ANGLE, &ctx->num_samples);
-	if (ctx->num_samples > 1)
-	    ctx->has_angle_multisampling = TRUE;
+	ctx->has_angle_multisampling = TRUE;
     }
 #endif
 
 #if CAIRO_HAS_GLESV3_SURFACE || CAIRO_HAS_EVASGL_SURFACE
-    if (ctx->num_samples == 1 &&
+    if (ctx->msaa_type === CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE &&
 	is_gles && ctx->has_packed_depth_stencil) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES, &ctx->num_samples);
 	/* this is work around for evasgl.  At this moment, if
