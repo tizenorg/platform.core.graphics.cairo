@@ -33,6 +33,27 @@
 #include "cairo-gl-private.h"
 
 #include <errno.h>
+int _cairo_glsl_get_version (cairo_gl_dispatch_t *dispatch)
+{
+    int major, minor;
+    const char *version = (const char *) dispatch->GetString (GL_SHADING_LANGUAGE_VERSION);
+    const char *dot = version == NULL ? NULL : strchr (version, '.');
+    const char *major_start = dot;
+
+    /* Sanity check */
+    if (dot == NULL || dot == version || *(dot + 1) == '\0') {
+	major = 0;
+	minor = 0;
+    } else {
+	/* Find the start of the major version in the string */
+	while (major_start > version && *major_start != ' ')
+	    --major_start;
+	major = strtol (major_start, NULL, 10);
+	minor = strtol (dot + 1, NULL, 10);
+    }
+
+    return CAIRO_GL_VERSION_ENCODE (major, minor);
+}
 
 int _cairo_gl_get_version (cairo_gl_dispatch_t *dispatch)
 {
@@ -101,18 +122,33 @@ _cairo_gl_get_vbo_size (void)
 cairo_bool_t
 _cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext)
 {
-    const char *extensions = (const char *) dispatch->GetString (GL_EXTENSIONS);
-    size_t len = strlen (ext);
-    const char *ext_ptr = extensions;
+    int version = _cairo_gl_get_version (dispatch);
+    if (version >= CAIRO_GL_VERSION_ENCODE (3, 0)) {
+	GLuint max_num_extensions;
+	int i;
+	dispatch->GetIntegerv (GL_NUM_EXTENSIONS, &max_num_extensions);
 
-    if (unlikely (ext_ptr == NULL))
-	return 0;
+	for (i = 0; i < max_num_extensions; i++) {
+	    const char *extension = (const char *) dispatch->GetStringi (GL_EXTENSIONS, i);
+	    if (strstr (extension, ext) == 0)
+		return TRUE;
+	}
+	return FALSE;
+    } else {
+	const char *extensions = (const char *) dispatch->GetString (GL_EXTENSIONS);
+	size_t len = strlen (ext);
+	const char *ext_ptr = extensions;
+	
 
-    while ((ext_ptr = strstr (ext_ptr, ext)) != NULL) {
-	if (ext_ptr[len] == ' ' || ext_ptr[len] == '\0')
-	    break;
-	ext_ptr += len;
+	if (unlikely (ext_ptr == NULL))
+	    return 0;
+
+	while ((ext_ptr = strstr (ext_ptr, ext)) != NULL) {
+	    if (ext_ptr[len] == ' ' || ext_ptr[len] == '\0')
+		break;
+	    ext_ptr += len;
+ 	}
+
+	return (ext_ptr != NULL);
     }
-
-    return (ext_ptr != NULL);
 }

@@ -775,7 +775,7 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
 	/* When using GL_ALPHA, compositing doesn't work properly, but for
 	 * caching surfaces, we are just uploading pixel data, so it isn't
 	 * an issue. */
-	if (for_caching)
+	if (for_caching && !ctx->is_gl33)
 	    format = GL_ALPHA;
 	else
 	    format = GL_RGBA;
@@ -1235,6 +1235,7 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	}
 
 	if (require_conversion) {
+	    src->base.is_clear = FALSE;
 	    rgba_clone = (cairo_image_surface_t *)
 		_cairo_image_surface_create_with_pixman_format (NULL,
 								pixman_format,
@@ -1254,6 +1255,31 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 
 	    src = rgba_clone;
 	}
+    } else if (ctx->is_gl33 && src->base.content == CAIRO_CONTENT_ALPHA) {
+	/* use RGBA for ALPHA */	    
+	pixman_format_code_t pixman_format;
+	cairo_surface_pattern_t pattern;
+	src->base.is_clear = FALSE;
+	pixman_format = _cairo_is_little_endian () ? PIXMAN_a8b8g8r8 : PIXMAN_r8g8b8a8;
+
+	rgba_clone = (cairo_image_surface_t *)
+		_cairo_image_surface_create_with_pixman_format (NULL,
+								pixman_format,
+								src->width,
+								src->height,
+								0);
+	if (unlikely (rgba_clone->base.status))
+	    goto FAIL;
+
+	_cairo_pattern_init_for_surface (&pattern, &src->base);
+	status = _cairo_surface_paint (&rgba_clone->base,
+				       CAIRO_OPERATOR_SOURCE,
+				       &pattern.base, NULL);
+	_cairo_pattern_fini (&pattern.base);
+	if (unlikely (status))
+	    goto FAIL;
+
+	src = rgba_clone;
     }	    
 
     if (! _cairo_gl_get_image_format_and_type (ctx->gl_flavor,
@@ -1319,7 +1345,7 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	}
 	else
 	{
-	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, 4);
+	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, cpp);
 	    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
 		ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
 		ctx->dispatch.PixelStorei (GL_UNPACK_ROW_LENGTH, src->stride / cpp);
@@ -1506,8 +1532,8 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
 	return NULL;
     }
 
-    if (_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES2 ||
-	_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES3) {
+    /*if (_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES2 ||
+	_cairo_gl_surface_flavor (surface) == CAIRO_GL_FLAVOR_ES3)*/ {
 	/* If only RGBA is supported, we must download data in a compatible
 	 * format. This means that pixman will convert the data on the CPU when
 	 * interacting with other image surfaces. For ALPHA, GLES2 does not
@@ -1562,10 +1588,11 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
     flipped = ! _cairo_gl_surface_is_texture (surface);
     mesa_invert = flipped && ctx->has_mesa_pack_invert;
 
-    ctx->dispatch.PixelStorei (GL_PACK_ALIGNMENT, 4);
+    ctx->dispatch.PixelStorei (GL_PACK_ALIGNMENT, cpp);
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
 	ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
 	ctx->dispatch.PixelStorei (GL_PACK_ROW_LENGTH, image->stride / cpp);
+
     if (mesa_invert)
 	ctx->dispatch.PixelStorei (GL_PACK_INVERT_MESA, 1);
 
@@ -1576,6 +1603,7 @@ _cairo_gl_surface_map_to_image (void      *abstract_surface,
     ctx->dispatch.ReadPixels (extents->x, y,
 			      extents->width, extents->height,
 			      format, type, image->data);
+
     if (mesa_invert)
 	ctx->dispatch.PixelStorei (GL_PACK_INVERT_MESA, 0);
 

@@ -435,6 +435,7 @@ typedef struct _cairo_gl_dispatch {
     void (*GetFloatv) (GLenum pname, GLfloat *data);
     void (*GetIntegerv) (GLenum pname, GLint *data);
     const GLubyte *(*GetString) (GLenum pname);
+    const GLubyte *(*GetStringi) (GLenum pname, GLuint i);
     void (*PixelStorei) (GLenum pname, GLint param);
     void (*ReadPixels) (GLint x, GLint y, GLsizei width, GLsizei height,
 			GLenum format, GLenum type, GLvoid *data);
@@ -459,11 +460,17 @@ typedef struct _cairo_gl_dispatch {
 
     /* Buffers */
     void (*GenBuffers) (GLsizei n, GLuint *buffers);
+    void (*DeleteBuffers) (GLsizei n, const GLuint *buffers);
     void (*BindBuffer) (GLenum target, GLuint buffer);
     void (*BufferData) (GLenum target, GLsizeiptr size,
 			  const GLvoid* data, GLenum usage);
+    void (*BufferSubData) (GLenum target, GLintptr offset,
+			   GLsizeiptr size, const GLvoid *data);
     GLvoid *(*MapBuffer) (GLenum target, GLenum access);
     GLboolean (*UnmapBuffer) (GLenum target);
+    void (*GenVertexArrays) (GLsizei n, GLuint *arrays);
+    void (*BindVertexArray) (GLuint array);
+    void (*DeleteVertexArrays) (GLsizei n, const GLuint *arrays);
 
     /* Shaders */
     GLuint (*CreateShader) (GLenum type);
@@ -557,6 +564,9 @@ typedef struct _cairo_gl_states {
     cairo_bool_t scissor_test_enabled;
     cairo_bool_t stencil_test_enabled;
 
+    GLuint bound_vbo;
+    GLuint bound_vao;
+    GLuint bound_ibo;
 } cairo_gl_states_t;
 
 struct _cairo_gl_context {
@@ -564,7 +574,6 @@ struct _cairo_gl_context {
 
     const cairo_compositor_t *compositor;
 
-    GLuint texture_load_pbo;
     GLint max_framebuffer_size;
     GLint max_texture_size;
     GLint max_textures;
@@ -573,6 +582,9 @@ struct _cairo_gl_context {
     GLint num_samples;
     cairo_bool_t supports_msaa;
     char *vb;
+    GLuint vbo;
+    GLuint vao;
+    GLuint ibo;
 
     cairo_bool_t has_shader_support;
 
@@ -611,6 +623,7 @@ struct _cairo_gl_context {
     cairo_bool_t has_packed_depth_stencil;
     cairo_bool_t has_npot_repeat;
     cairo_bool_t can_read_bgra;
+    cairo_bool_t is_gl33;
 
     cairo_bool_t thread_aware;
 
@@ -822,6 +835,45 @@ _enable_scissor_buffer (cairo_gl_context_t *ctx)
     }
 }
 
+static cairo_always_inline void
+_cairo_gl_ensure_drawbuffers (cairo_gl_context_t *ctx)
+{
+    GLint vbo, ibo, vao;
+
+    if ((ctx->vao != 0 && 
+	 (ctx->vao != ctx->states_cache.bound_vao))) {
+	ctx->dispatch.GetIntegerv (GL_VERTEX_ARRAY_BINDING, &vao);
+	if (vao != ctx->states_cache.bound_vao) {
+	    ctx->dispatch.BindVertexArray (ctx->vao);
+	    ctx->states_cache.bound_vao = ctx->vao;
+
+	    ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
+	    ctx->states_cache.bound_vbo = ctx->vbo;
+
+	    ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
+	    ctx->states_cache.bound_ibo = ctx->ibo;
+	}
+    }
+
+    if ((ctx->vbo != 0 &&
+	 (ctx->vbo != ctx->states_cache.bound_vbo))) {
+	ctx->dispatch.GetIntegerv (GL_ARRAY_BUFFER_BINDING, &vbo);
+	if (vbo != (GLint) ctx->states_cache.bound_vbo) { 
+	    ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
+	}
+	ctx->states_cache.bound_vbo = ctx->vbo;
+    }
+
+    if ((ctx->ibo != 0 &&
+	 (ctx->ibo != ctx->states_cache.bound_ibo))) {
+	ctx->dispatch.GetIntegerv (GL_ELEMENT_ARRAY_BUFFER_BINDING, &ibo);
+	if (ibo != (GLint) ctx->states_cache.bound_ibo) { 
+	    ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
+	}
+	ctx->states_cache.bound_ibo = ctx->ibo;
+    }
+}
+
 cairo_private cairo_status_t
 _cairo_gl_composite_init (cairo_gl_composite_t *setup,
                           cairo_operator_t op,
@@ -1022,6 +1074,9 @@ _cairo_gl_shader_fini (cairo_gl_context_t *ctx, cairo_gl_shader_t *shader);
 
 cairo_private int
 _cairo_gl_get_version (cairo_gl_dispatch_t *dispatch);
+
+cairo_private int
+_cairo_glsl_get_version (cairo_gl_dispatch_t *dispatch);
 
 cairo_private cairo_gl_flavor_t
 _cairo_gl_get_flavor (cairo_gl_dispatch_t *dispatch);

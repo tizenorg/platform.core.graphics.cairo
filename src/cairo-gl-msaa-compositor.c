@@ -1205,7 +1205,7 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
     _cairo_gl_msaa_compositor_set_clip (composite, &setup);
     if (antialias != CAIRO_ANTIALIAS_NONE)
 	_cairo_gl_composite_set_multisample (&setup);
-
+    
     status = _cairo_gl_composite_begin (&setup, &ctx);
     if (unlikely (status))
 	goto cleanup_setup;

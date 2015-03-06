@@ -208,6 +208,15 @@ _gl_destroy (void *device)
     cairo_region_destroy (ctx->clip_region);
 
     free (ctx->vb);
+    if (ctx->vao) {
+	ctx->dispatch.DeleteVertexArrays (1, &ctx->vao);
+    }
+    if (ctx->vbo) {
+	ctx->dispatch.DeleteBuffers (1, &ctx->vbo);
+    }
+    if (ctx->ibo) {
+	ctx->dispatch.DeleteBuffers (1, &ctx->ibo);
+    }
 
     ctx->destroy (ctx);
 
@@ -262,6 +271,11 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
     cairo_bool_t is_gles = (gl_flavor == CAIRO_GL_FLAVOR_ES2 ||
 			    gl_flavor == CAIRO_GL_FLAVOR_ES3);
 
+    if (gl_version >= CAIRO_GL_VERSION_ENCODE (3, 30) &&
+	gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
+	ctx->is_gl33 = TRUE;
+    else
+	ctx->is_gl33 = FALSE;
     _cairo_device_init (&ctx->base, &_cairo_gl_device_backend);
 
     /* XXX The choice of compositor should be made automatically at runtime.
@@ -286,7 +300,8 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
 
     /* Check for required extensions */
     if (is_desktop) {
-	if (_cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_texture_non_power_of_two")) {
+	if (gl_version >= CAIRO_GL_VERSION_ENCODE (3, 0) ||
+	    _cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_texture_non_power_of_two")) {
 	    ctx->tex_target = GL_TEXTURE_2D;
 	    ctx->has_npot_repeat = TRUE;
 	} else if (_cairo_gl_has_extension (&ctx->dispatch, "GL_ARB_texture_rectangle")) {
@@ -319,7 +334,9 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
 	_cairo_gl_has_extension (&ctx->dispatch, "GL_MESA_pack_invert");
 
     ctx->has_packed_depth_stencil =
-	(is_desktop && _cairo_gl_has_extension (&ctx->dispatch, "GL_EXT_packed_depth_stencil")) ||
+	(is_desktop && 
+	 (gl_version >= CAIRO_GL_VERSION_ENCODE (3, 0) ||
+	  _cairo_gl_has_extension (&ctx->dispatch, "GL_EXT_packed_depth_stencil"))) ||
 	(is_gles && _cairo_gl_has_extension (&ctx->dispatch, "GL_OES_packed_depth_stencil"));
 
     ctx->num_samples = 1;
@@ -405,17 +422,42 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
 
     ctx->vbo_size = _cairo_gl_get_vbo_size();
 
+    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP &&
+	gl_version > CAIRO_GL_VERSION_ENCODE (3, 0)) {
+	ctx->dispatch.GenVertexArrays (1, &ctx->vao);
+	ctx->dispatch.BindVertexArray (ctx->vao);
+
+	ctx->dispatch.GenBuffers (1, &ctx->vbo);
+	ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
+	ctx->dispatch.BufferData (GL_ARRAY_BUFFER, ctx->vbo_size,
+				  NULL, GL_DYNAMIC_DRAW);
+
+	ctx->dispatch.GenBuffers (1, &ctx->ibo);
+	ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
+	ctx->dispatch.BufferData (GL_ELEMENT_ARRAY_BUFFER,
+				  ctx->vbo_size * 2,
+				  NULL, GL_DYNAMIC_DRAW);
+        ctx->states_cache.bound_vao = ctx->vao;
+        ctx->states_cache.bound_vbo = ctx->vbo;
+        ctx->states_cache.bound_ibo = ctx->ibo;
+    } else {
+	ctx->vbo = 0;
+	ctx->vao = 0;
+	ctx->ibo = 0;
+    }
+
     ctx->vb = malloc (ctx->vbo_size);
+
     if (unlikely (ctx->vb == NULL)) {
-	    _cairo_cache_fini (&ctx->gradients);
-	    return _cairo_error (CAIRO_STATUS_NO_MEMORY);
+	_cairo_cache_fini (&ctx->gradients);
+	ctx->dispatch.DeleteVertexArrays (1, &ctx->vao);
+	ctx->dispatch.DeleteBuffers (1, &ctx->vbo);
+	ctx->dispatch.DeleteBuffers (1, &ctx->ibo);
+	return _cairo_error (CAIRO_STATUS_NO_MEMORY);
     }
 
     ctx->primitive_type = CAIRO_GL_PRIMITIVE_TYPE_TRIANGLES;
     _cairo_array_init (&ctx->tristrip_indices, sizeof (unsigned short));
-
-    /* PBO for any sort of texture upload */
-    dispatch->GenBuffers (1, &ctx->texture_load_pbo);
 
     ctx->max_framebuffer_size = 0;
     ctx->dispatch.GetIntegerv (GL_MAX_RENDERBUFFER_SIZE, &ctx->max_framebuffer_size);
@@ -1079,4 +1121,8 @@ void _cairo_gl_context_reset (cairo_gl_context_t *ctx)
     ctx->dispatch.Disable (GL_DITHER);
 
     ctx->current_shader = NULL;
+
+    ctx->states_cache.bound_vbo = 0;
+    ctx->states_cache.bound_vao = 0;
+    ctx->states_cache.bound_ibo = 0;
 }
