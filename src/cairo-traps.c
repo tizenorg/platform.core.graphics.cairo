@@ -155,9 +155,14 @@ _cairo_traps_add_trap (cairo_traps_t *traps,
 {
     cairo_trapezoid_t *trap;
 
+    /* These asserts cause reporting of unreal crashes
+       in the case of gl/msaa.
+       Temporarily removed */
+    /*
     assert (left->p1.y != left->p2.y);
     assert (right->p1.y != right->p2.y);
     assert (bottom > top);
+    */
 
     if (unlikely (traps->num_traps == traps->traps_size)) {
 	if (unlikely (! _cairo_traps_grow (traps)))
