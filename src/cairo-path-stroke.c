@@ -281,7 +281,7 @@ _tessellate_fan (cairo_stroker_t *stroker,
     cairo_point_t stack_points[64], *points = stack_points;
     cairo_pen_t *pen = &stroker->pen;
     int start, stop, num_points = 0;
-    cairo_status_t status;
+    cairo_status_t status = CAIRO_STATUS_SUCCESS;
 
     if (stroker->has_bounds &&
 	! _cairo_box_contains_point (&stroker->bounds, midpt))
@@ -883,6 +883,7 @@ _cairo_stroker_add_caps (cairo_stroker_t *stroker)
 	double dx = 1.0, dy = 0.0;
 	cairo_slope_t slope = { CAIRO_FIXED_ONE, 0 };
 	cairo_stroke_face_t face;
+	face.length = 0.0;
 
 	_compute_normalized_device_slope (&dx, &dy,
 					  stroker->ctm_inverse, NULL);
@@ -999,6 +1000,7 @@ _cairo_stroker_line_to (void *closure,
     cairo_slope_t dev_slope;
     double slope_dx, slope_dy;
     cairo_status_t status;
+    start.length = 0.0;
 
     stroker->has_initial_sub_path = TRUE;
 
@@ -1053,6 +1055,7 @@ _cairo_stroker_spline_to (void *closure,
     cairo_status_t status;
 
     stroker->has_initial_sub_path = TRUE;
+    new_face.length = 0.0;
 
     if (stroker->current_point.x == point->x &&
 	stroker->current_point.y == point->y)
@@ -1160,6 +1163,7 @@ _cairo_stroker_line_to_dashed (void *closure,
     cairo_line_t segment;
     cairo_bool_t fully_in_bounds;
     cairo_status_t status;
+    sub_start.length = 0.0;
 
     stroker->has_initial_sub_path = stroker->dash.dash_starts_on;
 
@@ -1301,6 +1305,7 @@ _cairo_stroker_curve_to (void *closure,
     cairo_spline_add_point_func_t line_to;
     cairo_spline_add_point_func_t spline_to;
     cairo_status_t status = CAIRO_STATUS_SUCCESS;
+    face.length = 0.0;
 
     line_to = stroker->dash.dashed ?
 	(cairo_spline_add_point_func_t) _cairo_stroker_line_to_dashed :

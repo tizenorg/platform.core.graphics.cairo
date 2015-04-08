@@ -202,6 +202,9 @@ _egl_make_current_surfaceless(cairo_egl_context_t *ctx)
     const char *extensions;
 
     extensions = eglQueryString(ctx->display, EGL_EXTENSIONS);
+    if (extensions == NULL)
+	return FALSE;
+
     if (strstr(extensions, "EGL_KHR_surfaceless_context") == NULL &&
 	strstr(extensions, "EGL_KHR_surfaceless_opengl") == NULL)
 	return FALSE;

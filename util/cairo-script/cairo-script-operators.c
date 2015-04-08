@@ -1835,6 +1835,9 @@ _ft_create_for_source (csi_t *ctx,
     }
 
     data = _csi_slab_alloc (ctx, sizeof (*data));
+    if (data == NULL)
+	return _csi_error (CSI_STATUS_NO_MEMORY);
+
     data->bytes = NULL;
     data->source = source;
 
@@ -1985,6 +1988,8 @@ retry:
 				FC_FILE, 0,
 				(FcChar8 **) &filename) == FcResultMatch) {
 	    FcPatternDel (pattern, FC_FILE);
+	    if(font_face)
+		cairo_font_face_destroy (font_face);
 	    goto retry;
 	}
     }
@@ -1992,6 +1997,12 @@ retry:
     FcPatternDestroy (pattern);
 
     data = _csi_slab_alloc (ctx, sizeof (*data));
+    if (_csi_unlikely (data == NULL)) {
+	if(font_face)
+	    cairo_font_face_destroy (font_face);
+	return _csi_error (CSI_STATUS_NO_MEMORY);
+    }
+
     ctx->_faces = _csi_list_prepend (ctx->_faces, &data->blob.list);
     data->ctx = cairo_script_interpreter_reference (ctx);
     data->blob.hash = tmpl.hash;
@@ -2927,7 +2938,9 @@ _image_read_raw (csi_t *ctx,
 
 	stride = cairo_image_surface_get_stride (image);
 	data = cairo_image_surface_get_data (image);
-    } else {
+	if (data == NULL)
+	    return CAIRO_STATUS_NULL_POINTER;
+	} else {
 	stride = cairo_format_stride_for_width (format, width);
 	data = malloc (stride * height);
 	if (data == NULL)
@@ -3390,9 +3403,10 @@ _image_load_from_dictionary (csi_t *ctx,
 	    csi_object_free (ctx, &file);
 	    break;
 	}
-	if (_csi_unlikely (status))
+	if (_csi_unlikely (status)) {
+	    cairo_surface_destroy (image);
 	    return status;
-
+	}
 	image = _image_cached (ctx, image);
     } else
 	image = cairo_image_surface_create (format, width, height);
@@ -3416,8 +3430,10 @@ _image (csi_t *ctx)
 	return status;
 
     status = _image_load_from_dictionary (ctx, dict, &image);
-    if (_csi_unlikely (status))
+    if (_csi_unlikely (status)) {
+	cairo_surface_destroy (image);
 	return status;
+    }
 
     pop (1);
     obj.type = CSI_OBJECT_TYPE_SURFACE;
@@ -5378,7 +5394,8 @@ _set_source_image (csi_t *ctx)
     csi_status_t status;
     cairo_surface_t *surface;
     cairo_surface_t *source;
-
+    unsigned char *image_surface_data;
+    unsigned char *source_data;
     check (2);
 
     status = _csi_ostack_get_surface (ctx, 0, &source);
@@ -5401,8 +5418,16 @@ _set_source_image (csi_t *ctx)
 	else
 	{
 	    cairo_surface_flush (surface);
-	    memcpy (cairo_image_surface_get_data (surface),
-		    cairo_image_surface_get_data (source),
+	    image_surface_data = cairo_image_surface_get_data (surface);
+	    if (image_surface_data == NULL)
+		return _csi_error (CSI_STATUS_NULL_POINTER);
+
+	    source_data = cairo_image_surface_get_data (source);
+	    if (source_data == NULL)
+		return _csi_error (CSI_STATUS_NULL_POINTER);
+
+	    memcpy (image_surface_data,
+		    source_data,
 		    cairo_image_surface_get_height (source) * cairo_image_surface_get_stride (source));
 	    cairo_surface_mark_dirty (surface);
 	}
@@ -5876,14 +5901,23 @@ _show_text_glyphs (csi_t *ctx)
     }
 
     status = _csi_ostack_get_array (ctx, 2, &array);
-    if (_csi_unlikely (status))
+    if (_csi_unlikely (status)) {
+	if (clusters != stack_clusters)
+	    _csi_free (ctx, clusters);
 	return status;
+    }
     status = _csi_ostack_get_string (ctx, 3, &utf8_string);
-    if (_csi_unlikely (status))
+    if (_csi_unlikely (status)) {
+	if (clusters != stack_clusters)
+	    _csi_free (ctx, clusters);
 	return status;
+    }
     status = _csi_ostack_get_context (ctx, 4, &cr);
-    if (_csi_unlikely (status))
+    if (_csi_unlikely (status)) {
+	if (clusters != stack_clusters)
+	    _csi_free (ctx, clusters);
 	return status;
+    }
 
     /* count glyphs */
     nglyphs = 0;
@@ -5901,16 +5935,24 @@ _show_text_glyphs (csi_t *ctx)
     }
     if (nglyphs == 0) {
 	pop (4);
+	if (clusters != stack_clusters)
+	    _csi_free (ctx, clusters);
 	return CSI_STATUS_SUCCESS;
     }
 
     if (nglyphs > ARRAY_LENGTH (stack_glyphs)) {
-	if (_csi_unlikely ((unsigned) nglyphs >= INT_MAX / sizeof (cairo_glyph_t)))
+	if (_csi_unlikely ((unsigned) nglyphs >= INT_MAX / sizeof (cairo_glyph_t))) {
+	    if (clusters != stack_clusters)
+		_csi_free (ctx, clusters);
 	    return _csi_error (CSI_STATUS_NO_MEMORY);
+	}
 
 	glyphs = _csi_alloc (ctx, sizeof (cairo_glyph_t) * nglyphs);
-	if (_csi_unlikely (glyphs == NULL))
+	if (_csi_unlikely (glyphs == NULL)) {
+	    if (clusters != stack_clusters)
+		_csi_free (ctx, clusters);
 	    return _csi_error (CSI_STATUS_NO_MEMORY);
+	}
     } else
 	glyphs = stack_glyphs;
 
@@ -6102,6 +6144,7 @@ _surface (csi_t *ctx)
 	status = _image_load_from_dictionary (ctx, dict, &image);
 	if (_csi_unlikely (status)) {
 	    cairo_surface_destroy (surface);
+	    cairo_surface_destroy (image);
 	    return status;
 	}
 

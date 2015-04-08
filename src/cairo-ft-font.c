@@ -793,6 +793,8 @@ _cairo_ft_unscaled_font_set_scale (cairo_ft_unscaled_font_t *unscaled,
     FT_Matrix mat;
     FT_Error error;
 
+    memset (sf.shape, 0, sizeof (sf.shape[0][0]) * 2 * 2);
+
     assert (unscaled->face != NULL);
 
     if (unscaled->have_scale &&
@@ -1619,8 +1621,11 @@ _transform_glyph_bitmap (cairo_matrix_t         * shape,
 	return status;
 
     image = cairo_image_surface_create ((*surface)->format, width, height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     /* Draw the original bitmap transformed into the new bitmap
      */
@@ -2404,12 +2409,13 @@ _cairo_ft_scaled_glyph_init (void			*abstract_font,
 	    {
 		status = _transform_glyph_bitmap (&unscaled->current_shape,
 						  &surface);
-		if (unlikely (status))
-		    cairo_surface_destroy (&surface->base);
 	    }
 	}
-	if (unlikely (status))
+
+	if (unlikely (status)) {
+	    cairo_surface_destroy (&surface->base);
 	    goto FAIL;
+	}
 
 	_cairo_scaled_glyph_set_surface (scaled_glyph,
 					 &scaled_font->base,

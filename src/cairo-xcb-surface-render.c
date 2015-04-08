@@ -1971,12 +1971,16 @@ _clip_and_composite_with_mask (cairo_clip_t		*clip,
 {
     cairo_xcb_surface_t *mask;
     cairo_xcb_picture_t *src;
+    cairo_status_t status;
 
     mask = _create_composite_mask (clip,
 				   draw_func, mask_func, draw_closure,
 				   dst, extents);
-    if (unlikely (mask->base.status))
-	return mask->base.status;
+    if (unlikely (mask->base.status)) {
+	status = mask->base.status;
+	cairo_surface_destroy (&mask->base);
+	return status;
+    }
 
     if (pattern != NULL || dst->base.content != CAIRO_CONTENT_ALPHA) {
 	src = _cairo_xcb_picture_for_pattern (dst, pattern, extents);
@@ -2033,8 +2037,11 @@ _clip_and_composite_combine (cairo_clip_t		*clip,
     tmp = (cairo_xcb_surface_t *)
 	_cairo_xcb_surface_create_similar (dst, dst->base.content,
 					   extents->width, extents->height);
-    if (unlikely (tmp->base.status))
-	return tmp->base.status;
+    if (unlikely (tmp->base.status)) {
+	status = tmp->base.status;
+	cairo_surface_destroy (&tmp->base);
+	return status;
+    }
 
     /* create_similar() could have done a fallback to an image surface */
     assert (tmp->base.backend == &_cairo_xcb_surface_backend);
@@ -2148,13 +2155,17 @@ _clip_and_composite_source (cairo_clip_t		*clip,
 {
     cairo_xcb_surface_t *mask;
     cairo_xcb_picture_t *src;
+    cairo_status_t status;
 
     /* Create a surface that is mask IN clip */
     mask = _create_composite_mask (clip,
 				   draw_func, mask_func, draw_closure,
 				   dst, extents);
-    if (unlikely (mask->base.status))
-	return mask->base.status;
+    if (unlikely (mask->base.status)) {
+	status = mask->base.status;
+	cairo_surface_destroy (&mask->base);
+	return status;
+    }
 
     src = _cairo_xcb_picture_for_pattern (dst, pattern, extents);
     if (unlikely (src->base.status)) {
@@ -3725,8 +3736,11 @@ _cairo_xcb_surface_render_stroke_via_mask (cairo_xcb_surface_t		*dst,
     image = _cairo_xcb_surface_create_similar_image (dst, CAIRO_FORMAT_A8,
 						     extents->bounded.width,
 						     extents->bounded.height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     clip = _cairo_clip_copy_region (extents->clip);
     status = _cairo_surface_offset_stroke (image, x, y,
@@ -3865,8 +3879,11 @@ _cairo_xcb_surface_render_fill_via_mask (cairo_xcb_surface_t	*dst,
     image = _cairo_xcb_surface_create_similar_image (dst, CAIRO_FORMAT_A8,
 						     extents->bounded.width,
 						     extents->bounded.height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     clip = _cairo_clip_copy_region (extents->clip);
     status = _cairo_surface_offset_fill (image, x, y,
@@ -3975,8 +3992,15 @@ _cairo_xcb_surface_render_glyphs_via_mask (cairo_xcb_surface_t		*dst,
 						     _cairo_format_from_content (content),
 						     extents->bounded.width,
 						     extents->bounded.height);
-    if (unlikely (image->status))
-	return image->status;
+
+    if (image == NULL)
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
+
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     clip = _cairo_clip_copy_region (extents->clip);
     status = _cairo_surface_offset_glyphs (image, x, y,
@@ -4971,20 +4995,32 @@ _create_convolution_coef (double *convolution_matrix,
     if (is_x_pass) {
  	length = col;
 	values = _cairo_malloc_ab (length + 2, sizeof (xcb_render_fixed_t));
+	if (values == NULL)
+	    return NULL;
  	v = col;
  	values[0] = _cairo_fixed_16_16_from_double (v);
   	values[1] = _cairo_fixed_16_16_from_double (1.0);
 	coef = _cairo_malloc_ab (length, sizeof (double));
+	if (coef == NULL) {
+	    free (values);
+	    return NULL;
+	}
 	memset (coef, 0, sizeof (double) * length);
  	compute_x_coef_to_double (convolution_matrix, row, col, coef);
     }
     else {
  	length = row;
 	values = _cairo_malloc_ab (length + 2, sizeof (xcb_render_fixed_t));
+	if (values == NULL)
+	    return NULL;
   	values[0] = _cairo_fixed_16_16_from_double (1.0);
  	v = row;
  	values[1] = _cairo_fixed_16_16_from_double (v);
 	coef = _cairo_malloc_ab (length, sizeof (double));
+	if (coef == NULL) {
+	    free (values);
+	    return NULL;
+	}
 	memset (coef, 0, sizeof (double) * length);
  	compute_y_coef_to_double (convolution_matrix, row, col, coef);
     }

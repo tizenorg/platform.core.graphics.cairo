@@ -1403,8 +1403,11 @@ cairo_surface_create_observer (cairo_surface_t *target,
 
     record = mode & CAIRO_SURFACE_OBSERVER_RECORD_OPERATIONS;
     device = _cairo_device_create_observer_internal (target->device, record);
-    if (unlikely (device->status))
-	return _cairo_surface_create_in_error (device->status);
+    if (unlikely (device->status)) {
+	cairo_status_t status = device->status;
+	cairo_device_destroy (device);
+	return _cairo_surface_create_in_error (status);
+    }
 
     surface = _cairo_surface_create_observer_internal (device, target);
     cairo_device_destroy (device);
@@ -1579,7 +1582,7 @@ print_array (cairo_output_stream_t *stream,
 	     const char **names,
 	     int count)
 {
-    int order[64];
+    int order[64] = {0,};
     int i, j;
 
     assert (count < ARRAY_LENGTH (order));

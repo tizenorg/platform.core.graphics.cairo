@@ -793,6 +793,8 @@ line_to (void *closure, const cairo_point_t *point)
     cairo_slope_t dev_slope;
 
     stroker->has_initial_sub_path = TRUE;
+    memset (&start, 0, sizeof (cairo_stroke_face_t));
+    memset (&end, 0, sizeof (cairo_stroke_face_t));
 
     if (p1->x == p2->x && p1->y == p2->y)
 	return CAIRO_STATUS_SUCCESS;
@@ -830,6 +832,9 @@ line_to_dashed (void *closure, const cairo_point_t *point)
     cairo_slope_t dev_slope;
     cairo_line_t segment;
     cairo_bool_t fully_in_bounds;
+
+    memset (&sub_start, 0, sizeof (cairo_stroke_face_t));
+    memset (&sub_end, 0, sizeof (cairo_stroke_face_t));
 
     stroker->has_initial_sub_path = stroker->dash.dash_starts_on;
 

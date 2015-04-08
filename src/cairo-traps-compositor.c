@@ -636,8 +636,11 @@ clip_and_composite_combine (const cairo_traps_compositor_t *compositor,
 					 extents->bounded.width,
 					 extents->bounded.height,
 					 NULL);
-    if (unlikely (tmp->status))
-	return tmp->status;
+    if (unlikely (tmp->status)) {
+	status = tmp->status;
+	cairo_surface_destroy (tmp);
+	return status;
+    }
 
     status = compositor->acquire (tmp);
     if (unlikely (status)) {
@@ -701,7 +704,7 @@ clip_and_composite_source (const cairo_traps_compositor_t	*compositor,
 			   int src_y,
 			   const cairo_composite_rectangles_t	*extents)
 {
-    cairo_surface_t *mask;
+    cairo_surface_t *mask = NULL;
     /* create a white color pattern */
     cairo_pattern_t *white_pattern = _cairo_pattern_create_solid (CAIRO_COLOR_WHITE);
     cairo_surface_t *white_mask =

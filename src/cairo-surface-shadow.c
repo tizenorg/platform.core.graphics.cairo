@@ -258,7 +258,10 @@ _cairo_shadow_cache_list_init (cairo_shadow_cache_list_t *shadow_cache_list,
 			       cairo_surface_t           *target)
 {
     cairo_status_t  status;
-    cairo_device_t *device = target->device;
+    cairo_device_t *device = NULL;
+
+    if(target != NULL)
+	device = target->device;
 
     if (device != NULL) {
 	shadow_cache_list->caches = &device->shadow_caches;
@@ -1982,6 +1985,10 @@ _cairo_surface_inset_shadow_glyphs (cairo_surface_t		*target,
 
     shadow_glyphs = (cairo_glyph_t *)_cairo_malloc_ab (num_glyphs,
 						       sizeof (cairo_glyph_t));
+    if (shadow_glyphs == NULL) {
+	status = CAIRO_STATUS_NO_MEMORY;
+	goto FINISH;
+    }
 
     status = _cairo_surface_glyphs_get_offset_extents (target,
 						       TRUE,
@@ -2176,6 +2183,8 @@ _cairo_surface_shadow_glyphs (cairo_surface_t		*target,
 						   shadow);
     shadow_glyphs = (cairo_glyph_t *)_cairo_malloc_ab (num_glyphs,
 						       sizeof (cairo_glyph_t));
+    if (shadow_glyphs == NULL)
+	return CAIRO_STATUS_NO_MEMORY;
 
     ((cairo_pattern_t *)source)->shadow.type = CAIRO_SHADOW_NONE;
     ((cairo_pattern_t *)source)->shadow.draw_shadow_only = FALSE;

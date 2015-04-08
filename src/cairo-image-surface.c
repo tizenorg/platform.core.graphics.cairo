@@ -1461,7 +1461,7 @@ _cairo_image_surface_create_from_image (cairo_image_surface_t *other,
 					int x, int y,
 					int width, int height, int stride)
 {
-    cairo_image_surface_t *surface;
+    cairo_image_surface_t *surface = NULL;
     cairo_status_t status;
     pixman_image_t *image;
     void *mem = NULL;
@@ -1507,6 +1507,7 @@ cleanup_image:
 cleanup_mem:
     free (mem);
 cleanup:
+    cairo_surface_destroy (&surface->base);
     return (cairo_image_surface_t *) _cairo_surface_create_in_error (status);
 }
 

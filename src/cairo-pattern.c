@@ -293,11 +293,15 @@ static cairo_status_t
 _cairo_mesh_pattern_init_copy (cairo_mesh_pattern_t       *pattern,
 			       const cairo_mesh_pattern_t *other)
 {
+    void *data = NULL;
     *pattern = *other;
 
     _cairo_array_init (&pattern->patches,  sizeof (cairo_mesh_patch_t));
+    data = _cairo_array_index_const (&other->patches, 0);
+    if (data == NULL)
+	return CAIRO_STATUS_NULL_POINTER;
     return _cairo_array_append_multiple (&pattern->patches,
-					 _cairo_array_index_const (&other->patches, 0),
+					 data,
 					 _cairo_array_num_elements (&other->patches));
 }
 
@@ -374,6 +378,9 @@ _cairo_pattern_init_copy (cairo_pattern_t	*pattern,
         int size = row * col;
 
         pattern->convolution_matrix = _cairo_malloc_ab (size, sizeof(double));
+	if (pattern->convolution_matrix == NULL)
+	    return CAIRO_STATUS_NO_MEMORY;
+
         memcpy (pattern->convolution_matrix, other->convolution_matrix,
                 sizeof (double) * size);
     }
@@ -4228,6 +4235,9 @@ _cairo_mesh_pattern_equal (const cairo_mesh_pattern_t *a,
     for (i = 0; i < num_patches_a; i++) {
 	patch_a = _cairo_array_index_const (&a->patches, i);
 	patch_b = _cairo_array_index_const (&b->patches, i);
+	if (patch_a == NULL || patch_b == NULL)
+	    return FALSE;
+
 	if (memcmp (patch_a, patch_b, sizeof(cairo_mesh_patch_t)) != 0)
 	    return FALSE;
     }
@@ -4636,6 +4646,9 @@ cairo_mesh_pattern_get_path (cairo_pattern_t *pattern,
 
     patch = _cairo_array_index_const (&mesh->patches, patch_num);
 
+    if (patch == NULL)
+	return _cairo_path_create_in_error (_cairo_error (CAIRO_STATUS_INVALID_INDEX));
+
     path = malloc (sizeof (cairo_path_t));
     if (path == NULL)
 	return _cairo_path_create_in_error (_cairo_error (CAIRO_STATUS_NO_MEMORY));
@@ -4734,6 +4747,8 @@ cairo_mesh_pattern_get_corner_color_rgba (cairo_pattern_t *pattern,
 	return _cairo_error (CAIRO_STATUS_INVALID_INDEX);
 
     patch = _cairo_array_index_const (&mesh->patches, patch_num);
+    if (patch == NULL)
+	return _cairo_error(CAIRO_STATUS_NULL_POINTER);
 
     if (red)
 	*red = patch->colors[corner_num].red;
@@ -4800,6 +4815,8 @@ cairo_mesh_pattern_get_control_point (cairo_pattern_t *pattern,
 	return _cairo_error (CAIRO_STATUS_INVALID_INDEX);
 
     patch = _cairo_array_index_const (&mesh->patches, patch_num);
+    if (patch == NULL)
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
 
     i = mesh_control_point_i[point_num];
     j = mesh_control_point_j[point_num];
@@ -4977,6 +4994,8 @@ _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern,
     y_sigma_sq = 2 * y_sigma * y_sigma;
 
     buffer = _cairo_malloc_ab (n, sizeof (double));
+    if (buffer == NULL)
+	return CAIRO_STATUS_NO_MEMORY;
 
     i = 0;
     for (y = -row; y <= row; y++) {

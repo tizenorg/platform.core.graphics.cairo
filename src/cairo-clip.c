@@ -149,6 +149,8 @@ _cairo_clip_copy (const cairo_clip_t *clip)
 	return (cairo_clip_t *) clip;
 
     copy = _cairo_clip_create ();
+    if (copy == NULL)
+	return NULL;
 
     if (clip->path)
 	copy->path = _cairo_clip_path_reference (clip->path);
@@ -185,6 +187,9 @@ _cairo_clip_copy_path (const cairo_clip_t *clip)
     assert (clip->num_boxes);
 
     copy = _cairo_clip_create ();
+    if (copy == NULL)
+	return NULL;
+
     copy->extents = clip->extents;
     if (clip->path)
 	copy->path = _cairo_clip_path_reference (clip->path);
@@ -204,6 +209,9 @@ _cairo_clip_copy_region (const cairo_clip_t *clip)
     assert (clip->num_boxes);
 
     copy = _cairo_clip_create ();
+    if (copy == NULL)
+	return NULL;
+
     copy->extents = clip->extents;
 
     if (clip->num_boxes == 1) {

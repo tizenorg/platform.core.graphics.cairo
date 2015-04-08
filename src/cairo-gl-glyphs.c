@@ -376,6 +376,10 @@ render_glyphs (cairo_gl_surface_t *dst,
 								cairo_gl_glyph_t,
 								base);
 	    } else {
+		if (cache == NULL) {
+		    status = CAIRO_STATUS_NULL_POINTER;
+		    goto FINISH;
+		}
 		status = _cairo_gl_glyph_cache_add_glyph (ctx, cache, scaled_glyph);
 
 		if (status == CAIRO_INT_STATUS_UNSUPPORTED) {
@@ -398,6 +402,10 @@ render_glyphs (cairo_gl_surface_t *dst,
 	x2 = x1 + scaled_glyph->surface->width;
 	y2 = y1 + scaled_glyph->surface->height;
 
+	if (cache == NULL) {
+	    status = CAIRO_STATUS_NULL_POINTER;
+	    goto FINISH;
+	}
 	glyph = _cairo_gl_glyph_cache_lock (cache, scaled_glyph);
 	assert (emit);
 	emit (ctx,

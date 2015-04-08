@@ -212,13 +212,19 @@ composite (void			*_dst,
     cairo_gl_composite_t setup;
     cairo_gl_context_t *ctx;
     cairo_int_status_t status;
+    cairo_gl_operand_t *temp_operand = NULL;
 
     status = _cairo_gl_composite_init (&setup, op, _dst, FALSE);
     if (unlikely (status))
         goto FAIL;
 
-    _cairo_gl_composite_set_source_operand (&setup,
-					    source_to_operand (abstract_src));
+    temp_operand = source_to_operand (abstract_src);
+    if (temp_operand == NULL) {
+	status = CAIRO_STATUS_NULL_POINTER;
+	goto FAIL;
+    }
+
+    _cairo_gl_composite_set_source_operand (&setup, temp_operand);
     _cairo_gl_operand_translate (&setup.src, dst_x-src_x, dst_y-src_y);
 
     _cairo_gl_composite_set_mask_operand (&setup,
@@ -335,7 +341,9 @@ traps_to_operand (void *_dst,
 							  pixman_format);
     if (unlikely (image->status)) {
 	pixman_image_unref (pixman_image);
-	return image->status;
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
     }
 
     mask = _cairo_surface_create_scratch (_dst,
@@ -537,17 +545,26 @@ composite_tristrip (void		*_dst,
     cairo_gl_context_t *ctx;
     cairo_gl_surface_t *mask;
     cairo_int_status_t status;
+    cairo_gl_operand_t *temp_operand = NULL;
 
     mask = tristrip_to_surface (_dst, extents, antialias, strip);
-    if (unlikely (mask->base.status))
-	return mask->base.status;
+    if (unlikely (mask->base.status)) {
+	status = mask->base.status;
+	cairo_surface_destroy (&mask->base);
+	return status;
+    }
 
     status = _cairo_gl_composite_init (&setup, op, _dst, FALSE);
     if (unlikely (status))
         goto FAIL;
 
+    temp_operand = source_to_operand (abstract_src);
+    if (temp_operand == NULL) {
+	status = CAIRO_STATUS_NULL_POINTER;
+	goto FAIL;
+    }
     _cairo_gl_composite_set_source_operand (&setup,
-					    source_to_operand (abstract_src));
+					    temp_operand);
 
     //_cairo_gl_composite_set_mask_surface (&setup, mask, 0, 0);
 

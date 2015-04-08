@@ -321,6 +321,9 @@ static cairo_status_t
 _cairo_recording_surface_create_bbtree (cairo_recording_surface_t *surface)
 {
     cairo_command_t **elements = _cairo_array_index (&surface->commands, 0);
+    if (unlikely (elements == NULL))
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
+
     unsigned int *indices;
     cairo_status_t status;
     unsigned int i, count;
@@ -599,8 +602,11 @@ _cairo_recording_surface_acquire_source_image (void			 *abstract_surface,
     image = _cairo_image_surface_create_with_content (surface->base.content,
 						      surface->extents.width,
 						      surface->extents.height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     /* Handle recursion by returning future reads from the current image */
     proxy = attach_proxy (abstract_surface, image);
@@ -1722,6 +1728,11 @@ _cairo_recording_surface_replay_internal (cairo_recording_surface_t	*surface,
 
     num_elements = surface->commands.num_elements;
     elements = _cairo_array_index (&surface->commands, 0);
+    if (elements == NULL) {
+	status = CAIRO_STATUS_NULL_POINTER;
+	goto done;
+    }
+
     if (extents.width < r->width || extents.height < r->height) {
 	num_elements =
 	    _cairo_recording_surface_get_visible_commands (surface, &extents);
@@ -1922,6 +1933,9 @@ _cairo_recording_surface_replay_one (cairo_recording_surface_t	*surface,
 	return _cairo_error (CAIRO_STATUS_READ_ERROR);
 
     elements = _cairo_array_index (&surface->commands, 0);
+    if (elements == NULL)
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
+
     command = elements[index];
     switch (command->header.type) {
     case CAIRO_COMMAND_PAINT:
@@ -2059,8 +2073,10 @@ _recording_surface_get_ink_bbox (cairo_recording_surface_t *surface,
     cairo_surface_destroy (null_surface);
 
     status = analysis_surface->status;
-    if (unlikely (status))
+    if (unlikely (status)) {
+	cairo_surface_destroy (analysis_surface);
 	return status;
+    }
 
     if (transform != NULL)
 	_cairo_analysis_surface_set_ctm (analysis_surface, transform);

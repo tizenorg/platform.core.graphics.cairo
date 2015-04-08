@@ -769,9 +769,6 @@ composite_polygon (const cairo_spans_compositor_t	*compositor,
     if (needs_clip) {
 	TRACE ((stderr, "%s: unsupported clip\n", __FUNCTION__));
 	return CAIRO_INT_STATUS_UNSUPPORTED;
-	converter = _cairo_clip_tor_scan_converter_create (extents->clip,
-							   polygon,
-							   fill_rule, antialias);
     } else {
 	const cairo_rectangle_int_t *r = &extents->unbounded;
 

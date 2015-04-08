@@ -181,7 +181,7 @@ _cairo_xcb_surface_create_similar_image (void			*abstract_other,
 		 height > XLIB_COORD_MAX ||
 		 width  <= 0 ||
 		 height <= 0))
-	return NULL;
+	return _cairo_surface_create_in_error (_cairo_error (CAIRO_STATUS_INVALID_SIZE));
 
     pixman_format = _cairo_format_to_pixman_format_code (format);
 
@@ -333,7 +333,7 @@ _get_image (cairo_xcb_surface_t		 *surface,
 	    int x, int y,
 	    int width, int height)
 {
-    cairo_surface_t *image;
+    cairo_surface_t *image = NULL;
     cairo_xcb_connection_t *connection;
     xcb_get_image_reply_t *reply;
     cairo_int_status_t status;
@@ -456,6 +456,7 @@ _get_image (cairo_xcb_surface_t		 *surface,
     return image;
 
 FAIL:
+    cairo_surface_destroy (image);
     _cairo_xcb_connection_release (connection);
     return _cairo_surface_create_in_error (status);
 }
@@ -482,6 +483,7 @@ _cairo_xcb_surface_acquire_source_image (void *abstract_surface,
 {
     cairo_xcb_surface_t *surface = abstract_surface;
     cairo_surface_t *image;
+    cairo_int_status_t status = CAIRO_INT_STATUS_SUCCESS;
 
     if (surface->fallback != NULL) {
 	image = cairo_surface_reference (&surface->fallback->base);
@@ -496,8 +498,11 @@ _cairo_xcb_surface_acquire_source_image (void *abstract_surface,
     }
 
     image = _get_image (surface, FALSE, 0, 0, surface->width, surface->height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     _cairo_surface_attach_snapshot (&surface->base, image, NULL);
 
@@ -840,8 +845,9 @@ _cairo_xcb_surface_fallback (cairo_xcb_surface_t *surface,
 	surface->deferred_clear = FALSE;
 
 	surface->fallback = image;
+    } else {
+	cairo_surface_destroy (&image->base);
     }
-
     return &surface->fallback->base;
 }
 
@@ -1274,8 +1280,13 @@ _cairo_xcb_screen_from_visual (xcb_connection_t *connection,
 {
     xcb_depth_iterator_t d;
     xcb_screen_iterator_t s;
+    xcb_setup_t *set_up = NULL;
 
-    s = xcb_setup_roots_iterator (xcb_get_setup (connection));
+    set_up = xcb_get_setup (connection);
+    if(set_up == NULL)
+	return NULL;
+
+    s = xcb_setup_roots_iterator (set_up);
     for (; s.rem; xcb_screen_next (&s)) {
 	if (s.data->root_visual == visual->visual_id) {
 	    *depth = s.data->root_depth;

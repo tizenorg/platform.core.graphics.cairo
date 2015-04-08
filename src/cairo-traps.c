@@ -66,6 +66,7 @@ _cairo_traps_init (cairo_traps_t *traps)
     traps->traps_size = ARRAY_LENGTH (traps->traps_embedded);
     traps->traps = traps->traps_embedded;
 
+    traps->limits = NULL;
     traps->num_limits = 0;
     traps->has_intersections = FALSE;
 }

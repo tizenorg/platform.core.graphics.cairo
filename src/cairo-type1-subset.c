@@ -926,6 +926,11 @@ cairo_type1_font_subset_parse_charstring (cairo_type1_font_subset_t *font,
 			goto cleanup;
 		    }
 
+		    if (font->ps_stack.sp >= TYPE1_STACKSIZE) {
+			status = CAIRO_INT_STATUS_UNSUPPORTED;
+			goto cleanup;
+		    }
+
 		    /* T1 spec states that if the interpreter does not
 		     * support executing the callothersub, the results
 		     * must be taken from the callothersub arguments. */
@@ -1331,8 +1336,6 @@ cairo_type1_font_subset_write_private_dict (cairo_type1_font_subset_t *font,
 
     /* look for "dup" which marks the beginning of the first subr */
     array_start = find_token (subr_count_end, font->cleartext_end, "dup");
-    if (subrs == NULL)
-	return CAIRO_INT_STATUS_UNSUPPORTED;
 
     /* Read in the subroutines */
     status = cairo_type1_font_for_each_subr (font,
@@ -1378,7 +1381,13 @@ skip_subrs:
 	return status;
 
     font->glyphs = _cairo_array_index (&font->glyphs_array, 0);
+    if (font->glyphs == NULL)
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
+
     font->glyph_names = _cairo_array_index (&font->glyph_names_array, 0);
+    if (font->glyph_names == NULL)
+	return _cairo_error (CAIRO_STATUS_NULL_POINTER);
+
     font->base.num_glyphs = _cairo_array_num_elements (&font->glyphs_array);
     font->subset_index_to_glyphs = calloc (font->base.num_glyphs, sizeof font->subset_index_to_glyphs[0]);
     if (unlikely (font->subset_index_to_glyphs == NULL))

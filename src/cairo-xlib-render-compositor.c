@@ -1124,6 +1124,9 @@ _cairo_xlib_font_get_glyphset_info_for_format (cairo_xlib_display_t *display,
     if (info->glyphset == None) {
 	info->xrender_format =
 	    _cairo_xlib_display_get_xrender_format (display, info->format);
+	if (info->xrender_format == NULL)
+	    return NULL;
+
 	info->glyphset = XRenderCreateGlyphSet (display->display,
 						info->xrender_format);
     }
@@ -1218,6 +1221,10 @@ _cairo_xlib_surface_add_glyph (cairo_xlib_display_t *display,
 
     info = _cairo_xlib_font_get_glyphset_info_for_format (display, font,
 							  glyph_surface->format);
+    if (info == NULL) {
+	status = _cairo_error (CAIRO_STATUS_NULL_POINTER);
+	goto BAIL;
+    }
 
 #if 0
     /* If the glyph surface has zero height or width, we create
@@ -1250,8 +1257,10 @@ _cairo_xlib_surface_add_glyph (cairo_xlib_display_t *display,
 						  glyph_surface->width,
 						  glyph_surface->height);
 	status = tmp_surface->status;
-	if (unlikely (status))
+	if (unlikely (status)) {
+	    cairo_surface_destroy (tmp_surface);
 	    goto BAIL;
+	}
 
 	tmp_surface->device_transform = glyph_surface->base.device_transform;
 	tmp_surface->device_transform_inverse = glyph_surface->base.device_transform_inverse;

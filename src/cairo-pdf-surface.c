@@ -290,7 +290,8 @@ _cairo_pdf_surface_update_object (cairo_pdf_surface_t	*surface,
     cairo_pdf_object_t *object;
 
     object = _cairo_array_index (&surface->objects, resource.id - 1);
-    object->offset = _cairo_output_stream_get_position (surface->output);
+    if (object)
+	object->offset = _cairo_output_stream_get_position (surface->output);
 }
 
 static void
@@ -716,14 +717,16 @@ _cairo_pdf_surface_clear (cairo_pdf_surface_t *surface)
     size = _cairo_array_num_elements (&surface->page_patterns);
     for (i = 0; i < size; i++) {
 	pattern = (cairo_pdf_pattern_t *) _cairo_array_index (&surface->page_patterns, i);
-	cairo_pattern_destroy (pattern->pattern);
+	if (pattern)
+	    cairo_pattern_destroy (pattern->pattern);
     }
     _cairo_array_truncate (&surface->page_patterns, 0);
 
     size = _cairo_array_num_elements (&surface->page_surfaces);
     for (i = 0; i < size; i++) {
 	src_surface = (cairo_pdf_source_surface_t *) _cairo_array_index (&surface->page_surfaces, i);
-	cairo_surface_destroy (src_surface->surface);
+	if (src_surface)
+	    cairo_surface_destroy (src_surface->surface);
     }
     _cairo_array_truncate (&surface->page_surfaces, 0);
 
@@ -979,6 +982,8 @@ _cairo_pdf_surface_emit_group_resources (cairo_pdf_surface_t         *surface,
 
 	for (i = 0; i < num_smasks; i++) {
 	    smask = _cairo_array_index (&res->smasks, i);
+	    if (smask == NULL)
+		return;
 	    _cairo_output_stream_printf (surface->output,
 					 "      /s%d %d 0 R\n",
 					 smask->id, smask->id);
@@ -994,6 +999,8 @@ _cairo_pdf_surface_emit_group_resources (cairo_pdf_surface_t         *surface,
 				     "   /Pattern <<");
 	for (i = 0; i < num_resources; i++) {
 	    pattern = _cairo_array_index (&res->patterns, i);
+	    if (pattern == NULL)
+		return;
 	    _cairo_output_stream_printf (surface->output,
 					 " /p%d %d 0 R",
 					 pattern->id, pattern->id);
@@ -1009,6 +1016,8 @@ _cairo_pdf_surface_emit_group_resources (cairo_pdf_surface_t         *surface,
 				     "   /Shading <<");
 	for (i = 0; i < num_resources; i++) {
 	    shading = _cairo_array_index (&res->shadings, i);
+	    if (shading == NULL)
+		return;
 	    _cairo_output_stream_printf (surface->output,
 					 " /sh%d %d 0 R",
 					 shading->id, shading->id);
@@ -1025,6 +1034,8 @@ _cairo_pdf_surface_emit_group_resources (cairo_pdf_surface_t         *surface,
 
 	for (i = 0; i < num_resources; i++) {
 	    xobject = _cairo_array_index (&res->xobjects, i);
+	    if (xobject == NULL)
+		return;
 	    _cairo_output_stream_printf (surface->output,
 					 " /x%d %d 0 R",
 					 xobject->id, xobject->id);
@@ -1039,6 +1050,9 @@ _cairo_pdf_surface_emit_group_resources (cairo_pdf_surface_t         *surface,
 	_cairo_output_stream_printf (surface->output,"   /Font <<\n");
 	for (i = 0; i < num_resources; i++) {
 	    font = _cairo_array_index (&res->fonts, i);
+	    if (font == NULL)
+		return;
+
 	    _cairo_output_stream_printf (surface->output,
 					 "      /f-%d-%d %d 0 R\n",
 					 font->font_id,
@@ -1080,7 +1094,6 @@ _cairo_pdf_surface_create_smask_group (cairo_pdf_surface_t	    *surface,
 	group->extents.width = surface->width;
 	group->extents.height = surface->height;
     }
-    group->extents = *extents;
 
     return group;
 }
@@ -2041,6 +2054,8 @@ _cairo_pdf_surface_finish (void *abstract_surface)
 	status = _cairo_error (CAIRO_STATUS_NO_MEMORY);
 
     offset = _cairo_pdf_surface_write_xref (surface);
+    if (offset == -1)
+	status =  _cairo_error (CAIRO_STATUS_INVALID_INDEX);
 
     _cairo_output_stream_printf (surface->output,
 				 "trailer\n"
@@ -5682,7 +5697,9 @@ _cairo_pdf_surface_analyze_user_font_subset (cairo_scaled_font_subset_t *font_su
 						       FALSE);
     if (unlikely (type3_surface->status)) {
 	status2 = _cairo_output_stream_destroy (null_stream);
-	return type3_surface->status;
+	status = type3_surface->status;
+	cairo_surface_destroy (type3_surface);
+	return status;
     }
 
     _cairo_type3_glyph_surface_set_font_subsets_callback (type3_surface,
@@ -5745,7 +5762,9 @@ _cairo_pdf_surface_emit_type3_font_subset (cairo_pdf_surface_t		*surface,
     if (unlikely (type3_surface->status)) {
         free (glyphs);
         free (widths);
-	return type3_surface->status;
+	status = type3_surface->status;
+	cairo_surface_destroy (type3_surface);
+	return status;
     }
 
     _cairo_type3_glyph_surface_set_font_subsets_callback (type3_surface,
@@ -6011,6 +6030,8 @@ _cairo_pdf_surface_write_xref (cairo_pdf_surface_t *surface)
 				 "0000000000 65535 f \n");
     for (i = 0; i < num_objects; i++) {
 	object = _cairo_array_index (&surface->objects, i);
+	if (object == NULL)
+	    return -1;
 	snprintf (buffer, sizeof buffer, "%010ld", object->offset);
 	_cairo_output_stream_printf (surface->output,
 				     "%s 00000 n \n", buffer);

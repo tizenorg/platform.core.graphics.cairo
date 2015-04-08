@@ -1190,6 +1190,8 @@ _cairo_gstate_mask (cairo_gstate_t  *gstate,
 	    _cairo_color_multiply_alpha (&combined, mask_pattern.solid.color.alpha);
 	}
 
+	_cairo_color_init_rgba (&combined, combined.red, combined.green,
+				combined.blue, combined.alpha);
 	_cairo_pattern_init_solid (&source_pattern.solid, &combined);
 
 	status = _cairo_surface_paint (gstate->target, op,

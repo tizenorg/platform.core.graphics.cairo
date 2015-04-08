@@ -311,8 +311,11 @@ _cairo_surface_subsurface_acquire_source_image (void                    *abstrac
     image = _cairo_image_surface_create_with_content (surface->base.content,
 						      surface->extents.width,
 						      surface->extents.height);
-    if (unlikely (image->status))
-	return image->status;
+    if (unlikely (image->status)) {
+	status = image->status;
+	cairo_surface_destroy (image);
+	return status;
+    }
 
     _cairo_pattern_init_for_surface (&pattern, surface->target);
     cairo_matrix_init_translate (&pattern.base.matrix,

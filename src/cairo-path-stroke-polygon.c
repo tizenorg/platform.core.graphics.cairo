@@ -1317,8 +1317,11 @@ _cairo_path_fixed_stroke_to_polygon (const cairo_path_fixed_t	*path,
 
 	/* If the line width is so small that the pen is reduced to a
 	   single point, then we have nothing to do. */
-	if (stroker.pen.num_vertices <= 1)
+	if (stroker.pen.num_vertices <= 1) {
+	    if (stroker.pen.num_vertices)
+		_cairo_pen_fini (&stroker.pen);
 	    return CAIRO_STATUS_SUCCESS;
+        }
     }
 
     stroker.has_current_face = FALSE;

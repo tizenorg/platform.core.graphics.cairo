@@ -1517,6 +1517,8 @@ _cairo_gl_composite_append_vertex_indices (cairo_gl_context_t	*ctx,
        preexisting vertex to our first one. */
     if (number_of_indices > 0 && is_connected) {
 	const unsigned short *indices_array = _cairo_array_index_const (indices, 0);
+	if (indices_array == NULL)
+	    return CAIRO_STATUS_NULL_POINTER;
 	current_vertex_index = indices_array[number_of_indices - 1];
 
 	status = _cairo_array_append (indices, &current_vertex_index);

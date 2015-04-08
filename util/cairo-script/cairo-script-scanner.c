@@ -459,6 +459,11 @@ token_end (csi_t *ctx, csi_scanner_t *scan, csi_file_t *src)
 		csi_object_t *next;
 
 		next = _csi_stack_peek (&scan->procedure_stack, 0);
+		if (next == NULL) {
+		    longjmp (scan->jmpbuf, _csi_error (CSI_STATUS_NULL_POINTER));
+		    return;
+		}
+
 		status = csi_array_append (ctx, next->datum.array,
 					   &scan->build_procedure);
 		scan->build_procedure = *next;
@@ -1596,6 +1601,11 @@ _translate_string (csi_t *ctx,
 	void *mem = malloc (mem_len);
 	void *work = malloc(LZO2A_999_MEM_COMPRESS);
 
+	if (work == NULL) {
+	    free (mem);
+	    return CSI_STATUS_NO_MEMORY;
+	}
+
 	if (lzo2a_999_compress ((lzo_bytep) buf, buf_len,
 				(lzo_bytep) mem, &mem_len,
 				work) == 0 &&
@@ -1628,6 +1638,11 @@ _translate_string (csi_t *ctx,
 		void *mem = malloc (mem_len);
 		void *work = malloc(LZO2A_999_MEM_COMPRESS);
 
+		if (work == NULL) {
+		    free (mem);
+		    return CSI_STATUS_NO_MEMORY;
+		}
+
 		if (lzo2a_999_compress ((lzo_bytep) buf, buf_len,
 					(lzo_bytep) mem, &mem_len,
 					work) == 0)
@@ -1635,6 +1650,7 @@ _translate_string (csi_t *ctx,
 		    if (8 + mem_len > buf_len) {
 			method = NONE;
 			deflate = 0;
+			free (mem);
 		    } else {
 			free (buf);
 			method = LZO;
@@ -1647,6 +1663,7 @@ _translate_string (csi_t *ctx,
 		else
 		{
 		    free (buf);
+		    free (mem);
 		    buf = string->string;
 		    buf_len = string->len;
 		}

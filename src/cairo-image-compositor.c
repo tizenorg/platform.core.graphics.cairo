@@ -2576,6 +2576,8 @@ _inplace_spans (void *abstract_renderer,
     x1 = x0 = spans[0].x;
     do {
 	int len = spans[1].x - spans[0].x;
+	if (mask == NULL)
+	    return CAIRO_STATUS_NULL_POINTER;
 	*mask++ = spans[0].coverage;
 	if (len > 1) {
 	    if (len >= r->u.composite.run_length && spans[0].coverage == 0xff) {
@@ -2643,6 +2645,8 @@ _inplace_opacity_spans (void *abstract_renderer, int y, int h,
     do {
 	int len = spans[1].x - spans[0].x;
 	uint8_t m = mul8_8(spans[0].coverage, r->bpp);
+	if (mask == NULL)
+	    return CAIRO_STATUS_NULL_POINTER;
 	*mask++ = m;
 	if (len > 1) {
 	    if (m == 0 &&
@@ -2844,6 +2848,8 @@ _inplace_src_opacity_spans (void *abstract_renderer, int y, int h,
 	    mask = (uint8_t *)pixman_image_get_data (r->mask);
 	    x0 = spans[1].x;
 	} else {
+	    if (mask == NULL)
+		return CAIRO_STATUS_NULL_POINTER;
 	    *mask++ = m;
 	    if (len > 1) {
 		memset (mask, m, --len);

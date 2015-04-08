@@ -62,6 +62,9 @@ _cairo_gl_image_cache_init (cairo_gl_context_t *ctx, int width, int height,
 
     _cairo_surface_release_device_reference (cache_surface);
     *image_cache = _cairo_malloc (sizeof (cairo_gl_image_cache_t));
+    if (*image_cache == NULL)
+	return _cairo_error (CAIRO_STATUS_NO_MEMORY);
+
     (*image_cache)->surface = (cairo_gl_surface_t *)cache_surface;
     (*image_cache)->surface->supports_msaa = FALSE;
 

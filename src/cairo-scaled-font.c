@@ -1645,22 +1645,17 @@ cairo_scaled_font_glyph_extents (cairo_scaled_font_t   *scaled_font,
 	extents->height = 0.0;
     }
 
-    if (num_glyphs) {
-        double x0, y0, x1, y1;
+    double x0, y0, x1, y1;
 
-	x0 = glyphs[0].x;
-	y0 = glyphs[0].y;
+    x0 = glyphs[0].x;
+    y0 = glyphs[0].y;
 
-	/* scaled_glyph contains the glyph for num_glyphs - 1 already. */
-	x1 = glyphs[num_glyphs - 1].x + scaled_glyph->metrics.x_advance;
-	y1 = glyphs[num_glyphs - 1].y + scaled_glyph->metrics.y_advance;
+    /* scaled_glyph contains the glyph for num_glyphs - 1 already. */
+    x1 = glyphs[num_glyphs - 1].x + scaled_glyph->metrics.x_advance;
+    y1 = glyphs[num_glyphs - 1].y + scaled_glyph->metrics.y_advance;
 
-	extents->x_advance = x1 - x0;
-	extents->y_advance = y1 - y0;
-    } else {
-	extents->x_advance = 0.0;
-	extents->y_advance = 0.0;
-    }
+    extents->x_advance = x1 - x0;
+    extents->y_advance = y1 - y0;
 
  UNLOCK:
     _cairo_scaled_font_thaw_cache (scaled_font);
@@ -2623,8 +2618,10 @@ _trace_mask_to_path (cairo_image_surface_t *mask,
 
     mask = _cairo_image_surface_coerce_to_format (mask, CAIRO_FORMAT_A1);
     status = mask->base.status;
-    if (unlikely (status))
+    if (unlikely (status)) {
+	cairo_surface_destroy (&mask->base);
 	return status;
+    }
 
     cairo_surface_get_device_offset (&mask->base, &xoff, &yoff);
     x0 = _cairo_fixed_from_double (tx - xoff);

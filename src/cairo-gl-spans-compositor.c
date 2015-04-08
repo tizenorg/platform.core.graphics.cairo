@@ -447,9 +447,6 @@ _cairo_gl_span_renderer_init (cairo_abstract_span_renderer_t	*_r,
 		op == CAIRO_OPERATOR_OVER ||
 		op == CAIRO_OPERATOR_ADD)) {
 	op = CAIRO_OPERATOR_SOURCE;
-    } else if (op == CAIRO_OPERATOR_SOURCE) {
-	/* no lerp equivalent without some major PITA */
-	return CAIRO_INT_STATUS_UNSUPPORTED;
     } else if (! _cairo_gl_operator_is_supported (op))
 	return CAIRO_INT_STATUS_UNSUPPORTED;
 

@@ -1263,6 +1263,11 @@ compile_shader (cairo_gl_context_t *ctx,
     }
 
     log = _cairo_malloc (log_size + 1);
+    if (log == NULL) {
+	printf ("OpenGL shader compilation failed.\n");
+	ASSERT_NOT_REACHED;
+    }
+
     dispatch->GetShaderInfoLog (*shader, log_size, &num_chars, log);
     log[num_chars] = '\0';
 
@@ -1317,6 +1322,11 @@ link_shader_program (cairo_gl_context_t *ctx,
     }
 
     log = _cairo_malloc (log_size + 1);
+    if (log == NULL) {
+	printf ("OpenGL shader link failed.\n");
+	ASSERT_NOT_REACHED;
+    }
+
     dispatch->GetProgramInfoLog (*program, log_size, &num_chars, log);
     log[num_chars] = '\0';
 

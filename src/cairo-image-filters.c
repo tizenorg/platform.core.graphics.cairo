@@ -66,18 +66,33 @@ _pixman_image_create_convolution_params (double *params,
 
     if (x_pass) {
 	pixman_params = _cairo_malloc_ab (col + 2, sizeof (double));
- 	pixman_params[0] = pixman_int_to_fixed (col);
+	if (pixman_params == NULL)
+	    return NULL;
+
+	pixman_params[0] = pixman_int_to_fixed (col);
 	pixman_params[1] = pixman_int_to_fixed (1);
 	coef = _cairo_malloc_ab (col, sizeof (double));
+	if (coef == NULL) {
+	    free (pixman_params);
+	    return NULL;
+	}
+
 	memset (coef, 0, sizeof (double) * col);
 	compute_x_coef_to_double (params, row, col, coef);
 	length = col;
     }
     else {
 	pixman_params = _cairo_malloc_ab (row + 2, sizeof (double));
- 	pixman_params[0] = pixman_int_to_fixed (1);
+	if (pixman_params == NULL)
+	    return NULL;
+	pixman_params[0] = pixman_int_to_fixed (1);
 	pixman_params[1] = pixman_int_to_fixed (row);
 	coef = _cairo_malloc_ab (row, sizeof (double));
+	if (coef == NULL) {
+	    free (pixman_params);
+	    return NULL;
+	}
+
 	memset (coef, 0, sizeof (double) * row);
 	compute_y_coef_to_double (params, row, col, coef);
 	length = row;

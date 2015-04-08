@@ -973,6 +973,11 @@ _get_image_surface (cairo_xlib_surface_t    *surface,
 	    goto BAIL;
 
 	data = cairo_image_surface_get_data (&image->base);
+	if (data == NULL){
+	    status = CAIRO_STATUS_NULL_POINTER;
+	    goto BAIL;
+	}
+
 	rowstride = cairo_image_surface_get_stride (&image->base) >> 2;
 	row = (uint32_t *) data;
 	x0 = extents->x + surface->base.device_transform.x0;
@@ -2196,11 +2201,6 @@ cairo_xlib_surface_set_drawable (cairo_surface_t   *abstract_surface,
 
 	if (surface->picture != None) {
 	    XRenderFreePicture (display->display, surface->picture);
-	    if (unlikely (status)) {
-		status = _cairo_surface_set_error (&surface->base, status);
-		return;
-	    }
-
 	    surface->picture = None;
 	}
 

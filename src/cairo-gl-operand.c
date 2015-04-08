@@ -833,6 +833,7 @@ _cairo_gl_pattern_texture_setup (cairo_gl_operand_t *operand,
 
 fail:
     cairo_surface_destroy (&surface->base);
+    cairo_surface_destroy (image);
     return status;
 }
 
@@ -1255,6 +1256,8 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	operand->pass == 1) {
 	float x_axis = 1.0;
 	float y_axis = 0.0;
+	float temp_width;
+	float near_zero = 0.00001;
         _cairo_gl_shader_bind_float (ctx,
                                      ctx->current_shader->blur_x_axis_location[tex_unit],
                                      x_axis);
@@ -1267,9 +1270,12 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 				   ctx->current_shader->blur_radius_location[tex_unit],
 				   operand->texture.x_radius);
 
+	temp_width = cairo_gl_surface_get_width (&operand->texture.surface->base);
+	temp_width = (temp_width == 0) ? near_zero : temp_width;
+
 	_cairo_gl_shader_bind_float (ctx,
                                      ctx->current_shader->blur_step_location[tex_unit],
-				     1.0 / cairo_gl_surface_get_width (&operand->texture.surface->base));
+				     1.0 / temp_width);
 
 	_cairo_gl_shader_bind_float_array (ctx,
                                            ctx->current_shader->blurs_location [tex_unit],

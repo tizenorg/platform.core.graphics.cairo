@@ -246,6 +246,9 @@ _cairo_ps_surface_emit_header (cairo_ps_surface_t *surface)
     has_bbox = FALSE;
     num_comments = _cairo_array_num_elements (&surface->dsc_header_comments);
     comments = _cairo_array_index (&surface->dsc_header_comments, 0);
+    if (comments == NULL)
+	return;
+
     for (i = 0; i < num_comments; i++) {
 	_cairo_output_stream_printf (surface->final_stream,
 				     "%s\n", comments[i]);
@@ -680,8 +683,10 @@ _cairo_ps_surface_emit_type3_font_subset (cairo_ps_surface_t		*surface,
 						       surface->font_subsets,
 						       TRUE);
     status = type3_surface->status;
-    if (unlikely (status))
+    if (unlikely (status)) {
+	cairo_surface_destroy (type3_surface);
 	return status;
+    }
 
     for (i = 0; i < font_subset->num_glyphs; i++) {
 	if (font_subset->glyph_names != NULL) {
@@ -1649,18 +1654,27 @@ CLEANUP:
 
     num_comments = _cairo_array_num_elements (&surface->dsc_header_comments);
     comments = _cairo_array_index (&surface->dsc_header_comments, 0);
+    if (comments == NULL)
+	return CAIRO_STATUS_NULL_POINTER;
+
     for (i = 0; i < num_comments; i++)
 	free (comments[i]);
     _cairo_array_fini (&surface->dsc_header_comments);
 
     num_comments = _cairo_array_num_elements (&surface->dsc_setup_comments);
     comments = _cairo_array_index (&surface->dsc_setup_comments, 0);
+    if (comments == NULL)
+	return CAIRO_STATUS_NULL_POINTER;
+
     for (i = 0; i < num_comments; i++)
 	free (comments[i]);
     _cairo_array_fini (&surface->dsc_setup_comments);
 
     num_comments = _cairo_array_num_elements (&surface->dsc_page_setup_comments);
     comments = _cairo_array_index (&surface->dsc_page_setup_comments, 0);
+    if (comments == NULL)
+	return CAIRO_STATUS_NULL_POINTER;
+
     for (i = 0; i < num_comments; i++)
 	free (comments[i]);
     _cairo_array_fini (&surface->dsc_page_setup_comments);
@@ -1890,8 +1904,11 @@ _cairo_ps_surface_create_padded_image_from_image (cairo_ps_surface_t           *
 							    source->pixman_format,
 							    rect.width, rect.height,
 							    0);
-	if (pad_image->status)
-	    return pad_image->status;
+	if (pad_image->status) {
+	    status = pad_image->status;
+	    cairo_surface_destroy (pad_image);
+	    status;
+	}
 
 	_cairo_pattern_init_for_surface (&pad_pattern, &source->base);
 	cairo_matrix_init_translate (&pad_pattern.base.matrix, rect.x, rect.y);
@@ -2327,8 +2344,11 @@ _cairo_ps_surface_flatten_image_transparency (cairo_ps_surface_t    *surface,
     opaque = cairo_image_surface_create (CAIRO_FORMAT_RGB24,
 					 image->width,
 					 image->height);
-    if (unlikely (opaque->status))
-	return opaque->status;
+    if (unlikely (opaque->status)) {
+	status = opaque->status;
+	cairo_surface_destroy (opaque);
+	return status;
+    }
 
     if (surface->content == CAIRO_CONTENT_COLOR_ALPHA) {
 	status = _cairo_surface_paint (opaque,
@@ -3371,8 +3391,6 @@ _cairo_ps_surface_emit_surface_pattern (cairo_ps_surface_t      *surface,
 	if (unlikely (status))
 	    goto release_source;
     }
-    if (unlikely (status))
-	goto release_source;
 
     switch (pattern->extend) {
     case CAIRO_EXTEND_PAD:
@@ -4575,6 +4593,9 @@ _cairo_ps_surface_set_bounding_box (void		*abstract_surface,
     has_page_bbox = FALSE;
     num_comments = _cairo_array_num_elements (&surface->dsc_page_setup_comments);
     comments = _cairo_array_index (&surface->dsc_page_setup_comments, 0);
+    if (comments == NULL)
+	return CAIRO_STATUS_NULL_POINTER;
+
     for (i = 0; i < num_comments; i++) {
 	_cairo_output_stream_printf (surface->stream,
 				     "%s\n", comments[i]);

@@ -957,6 +957,7 @@ surface_source (cairo_xlib_surface_t *dst,
     cairo_surface_pattern_t local_pattern;
     cairo_status_t status;
     cairo_rectangle_int_t upload, limit;
+    XRenderPictFormat *format = NULL;
 
     src = pattern->surface;
     if (src->type == CAIRO_SURFACE_TYPE_IMAGE &&
@@ -974,9 +975,15 @@ surface_source (cairo_xlib_surface_t *dst,
 			     src->content);
 
 	proxy->source.dpy = dst->display->display;
+	format = _cairo_xlib_shm_surface_get_xrender_format(src);
+	if (format == NULL) {
+	    free (proxy);
+	    return _cairo_surface_create_in_error (CAIRO_STATUS_NULL_POINTER);
+	}
+
 	proxy->source.picture = XRenderCreatePicture (proxy->source.dpy,
 						      _cairo_xlib_shm_surface_get_pixmap (src),
-						      _cairo_xlib_shm_surface_get_xrender_format (src),
+						      format,
 						      0, NULL);
 	proxy->source.pixmap = None;
 
