@@ -1273,6 +1273,21 @@ _cairo_gl_composite_emit_glyph_vertex (cairo_gl_context_t *ctx,
     ctx->vb_offset += ctx->vertex_size;
 }
 
+static inline void
+_cairo_gl_composite_emit_color_glyph_vertex (cairo_gl_context_t *ctx,
+					     GLfloat x, GLfloat y,
+					     GLfloat glyph_x, GLfloat glyph_y)
+{
+    GLfloat *vb = (GLfloat *) (void *) &ctx->vb[ctx->vb_offset];
+
+    *vb++ = x;
+    *vb++ = y;
+    *vb++ = glyph_x;
+    *vb++ = glyph_y;
+
+    ctx->vb_offset += ctx->vertex_size;
+}
+
 static void
 _cairo_gl_composite_emit_glyph (cairo_gl_context_t *ctx,
                                 GLfloat x1, GLfloat y1,
@@ -1295,6 +1310,30 @@ _cairo_gl_composite_emit_glyph (cairo_gl_context_t *ctx,
     _cairo_gl_composite_emit_glyph_vertex (ctx, x2, y1, glyph_x2, glyph_y1);
     _cairo_gl_composite_emit_glyph_vertex (ctx, x2, y2, glyph_x2, glyph_y2);
     _cairo_gl_composite_emit_glyph_vertex (ctx, x1, y2, glyph_x1, glyph_y2);
+}
+
+static void
+_cairo_gl_composite_emit_color_glyph (cairo_gl_context_t *ctx,
+                                GLfloat x1, GLfloat y1,
+                                GLfloat x2, GLfloat y2,
+                                GLfloat glyph_x1, GLfloat glyph_y1,
+                                GLfloat glyph_x2, GLfloat glyph_y2)
+{
+    if (ctx->draw_mode != CAIRO_GL_VERTEX) {
+	_cairo_gl_composite_flush (ctx);
+	ctx->draw_mode = CAIRO_GL_VERTEX;
+    }
+
+    _cairo_gl_composite_prepare_buffer (ctx, 6,
+					CAIRO_GL_PRIMITIVE_TYPE_TRIANGLES);
+
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x1, y1, glyph_x1, glyph_y1);
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x2, y1, glyph_x2, glyph_y1);
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x1, y2, glyph_x1, glyph_y2);
+
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x2, y1, glyph_x2, glyph_y1);
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x2, y2, glyph_x2, glyph_y2);
+    _cairo_gl_composite_emit_color_glyph_vertex (ctx, x1, y2, glyph_x1, glyph_y2);
 }
 
 static void
@@ -1326,8 +1365,14 @@ _cairo_gl_composite_emit_solid_glyph (cairo_gl_context_t *ctx,
 }
 
 cairo_gl_emit_glyph_t
-_cairo_gl_context_choose_emit_glyph (cairo_gl_context_t *ctx)
+_cairo_gl_context_choose_emit_glyph (cairo_gl_context_t *ctx,
+				     const cairo_bool_t is_color_glyph)
 {
+    if ( is_color_glyph) {
+	/* color glyph ignore all source and mask */
+	return _cairo_gl_composite_emit_color_glyph;
+    }
+
     switch (ctx->operands[CAIRO_GL_TEX_SOURCE].type) {
     default:
     case CAIRO_GL_OPERAND_COUNT:

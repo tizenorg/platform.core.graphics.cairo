@@ -254,7 +254,42 @@ lerp (void			*dst,
     cairo_int_status_t status;
 
     /* we could avoid some repetition... */
-    status = composite (dst, CAIRO_OPERATOR_DEST_OUT, mask, NULL,
+    status = composite (dst, CAIRO_OPERATOR_DEST_OUT, mask, src,
+			mask_x, mask_y,
+			0, 0,
+			dst_x, dst_y,
+			width, height);
+    if (unlikely (status))
+	return status;
+
+    status = composite (dst, CAIRO_OPERATOR_ADD, src, mask,
+			src_x, src_y,
+			mask_x, mask_y,
+			dst_x, dst_y,
+			width, height);
+    if (unlikely (status))
+	return status;
+
+    return CAIRO_STATUS_SUCCESS;
+}
+
+static cairo_int_status_t
+lerp_color_glyph (void			*dst,
+		  cairo_surface_t	*src,
+		  cairo_surface_t	*mask,
+		  int			src_x,
+		  int			src_y,
+		  int			mask_x,
+		  int			mask_y,
+		  int			dst_x,
+		  int			dst_y,
+		  unsigned int		width,
+      unsigned int		height)
+{
+    cairo_int_status_t status;
+
+    /* we could avoid some repetition... */
+    status = composite (dst, CAIRO_OPERATOR_DEST_OUT, mask, src,
 			mask_x, mask_y,
 			0, 0,
 			dst_x, dst_y,
@@ -362,14 +397,51 @@ composite_traps (void			*_dst,
     cairo_gl_composite_t setup;
     cairo_gl_context_t *ctx;
     cairo_int_status_t status;
+    cairo_surface_t *src = (cairo_surface_t *) abstract_src;
+    cairo_surface_t *dst = (cairo_surface_t *) _dst;
+    cairo_surface_t *new_surface = NULL;
+    cairo_surface_t *new_src = (cairo_surface_t *) abstract_src;
+    int new_src_x, new_src_y;
+    cairo_surface_pattern_t new_surface_pattern;
+
+    if (dst == src) {
+	new_surface = _cairo_surface_create_similar_scratch (src,
+							     src->content,
+							     extents->width,
+							     extents->height);
+	status = new_surface->status;
+	if (unlikely (status)) {
+	    cairo_surface_destroy (new_surface);
+	    return status;
+	}
+
+	_cairo_pattern_init_for_surface (&new_surface_pattern, src);
+	new_surface_pattern.base.extend = CAIRO_EXTEND_NONE;
+	new_surface_pattern.base.filter = CAIRO_FILTER_NEAREST;
+	status = _cairo_surface_paint (new_surface, CAIRO_OPERATOR_SOURCE,
+				       &new_surface_pattern.base, NULL);
+
+	if (unlikely (status)) {
+	    _cairo_pattern_fini (&new_surface_pattern.base);
+	    cairo_surface_destroy (new_surface);
+	    return status;
+	}
+
+	new_src = _cairo_gl_pattern_to_source (dst,
+					       &new_surface_pattern.base,
+					       FALSE,
+					       extents, extents,
+					       &new_src_x, &new_src_y);
+    }
 
     status = _cairo_gl_composite_init (&setup, op, _dst, FALSE);
     if (unlikely (status))
         goto FAIL;
 
     _cairo_gl_composite_set_source_operand (&setup,
-					    source_to_operand (abstract_src));
-    _cairo_gl_operand_translate (&setup.src, -src_x-dst_x, -src_y-dst_y);
+					    source_to_operand (new_src));
+    if (src == new_src)
+	_cairo_gl_operand_translate (&setup.src, -src_x-dst_x, -src_y-dst_y);
     status = traps_to_operand (_dst, extents, antialias, traps, &setup.mask, dst_x, dst_y);
     if (unlikely (status))
 	goto FAIL;
@@ -387,6 +459,13 @@ composite_traps (void			*_dst,
 
 FAIL:
     _cairo_gl_composite_fini (&setup);
+
+    if (new_src != src) {
+	cairo_surface_destroy (new_src);
+	cairo_surface_destroy (new_surface);
+	_cairo_pattern_fini (&new_surface_pattern.base);
+    }
+	
     return status;
 }
 
@@ -516,7 +595,7 @@ _cairo_gl_traps_compositor_get (void)
 	compositor.composite = composite;
 	compositor.lerp = lerp;
 	// FIXME:
-	compositor.lerp_color_glyph = lerp;
+	compositor.lerp_color_glyph = lerp_color_glyph;
 	//compositor.check_composite_boxes = check_composite_boxes;
 	compositor.composite_boxes = composite_boxes;
 	//compositor.check_composite_traps = check_composite_traps;

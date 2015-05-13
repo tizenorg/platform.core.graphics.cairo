@@ -211,7 +211,7 @@ combine_clip_as_traps (const cairo_traps_compositor_t *compositor,
 
     if (draw_color_glyph)
 	status = compositor->composite_traps (mask, CAIRO_OPERATOR_IN, mask,
-					      src_x, src_y,
+					      0, 0,
 					      extents->x, extents->y,
 					      extents,
 					      antialias, &traps);

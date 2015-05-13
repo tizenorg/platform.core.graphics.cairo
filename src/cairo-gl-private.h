@@ -512,7 +512,9 @@ struct _cairo_gl_context {
 
     cairo_cache_t gradients;
 
-    cairo_gl_glyph_cache_t glyph_cache[2];
+    /* cache[0] for gray font, cache[1] for rgba component alpha
+     * cache[2] for color glyph */
+    cairo_gl_glyph_cache_t glyph_cache[3];
     cairo_list_t fonts;
 
     cairo_gl_surface_t *current_target;
@@ -693,7 +695,8 @@ cairo_private cairo_gl_emit_span_t
 _cairo_gl_context_choose_emit_span (cairo_gl_context_t *ctx);
 
 cairo_private cairo_gl_emit_glyph_t
-_cairo_gl_context_choose_emit_glyph (cairo_gl_context_t *ctx);
+_cairo_gl_context_choose_emit_glyph (cairo_gl_context_t *ctx,
+				     const cairo_bool_t is_color_glyph);
 
 cairo_private void
 _cairo_gl_context_activate (cairo_gl_context_t *ctx,
