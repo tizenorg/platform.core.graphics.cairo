@@ -242,6 +242,18 @@ struct cairo_traps_compositor {
 				 int			dst_y,
 				 unsigned int		width,
 				 unsigned int		height);
+    cairo_int_status_t
+	(*lerp_color_glyph)     (void			*_dst,
+				 cairo_surface_t	*abstract_src,
+				 cairo_surface_t	*abstract_mask,
+				 int			src_x,
+				 int			src_y,
+				 int			mask_x,
+				 int			mask_y,
+				 int			dst_x,
+				 int			dst_y,
+				 unsigned int		width,
+				 unsigned int		height);
 
     cairo_int_status_t
 	(*composite_boxes)	(void			*surface,

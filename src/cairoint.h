@@ -1329,6 +1329,13 @@ _cairo_surface_set_resolution (cairo_surface_t *surface,
                                double y_res);
 
 cairo_private cairo_surface_t *
+_cairo_surface_create_similar_scratch (cairo_surface_t *other,
+                                       cairo_content_t  content,
+                                       int              width,
+                                       int              height);
+
+
+cairo_private cairo_surface_t *
 _cairo_surface_create_for_rectangle_int (cairo_surface_t *target,
 					 const cairo_rectangle_int_t *extents);
 

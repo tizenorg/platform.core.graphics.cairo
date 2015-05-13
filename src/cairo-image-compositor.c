@@ -477,6 +477,52 @@ lerp (void			*_dst,
 }
 
 static cairo_int_status_t
+lerp_color_glyph (void			*_dst,
+		  cairo_surface_t	*abstract_src,
+		  cairo_surface_t	*abstract_mask,
+		  int			src_x,
+		  int			src_y,
+		  int			mask_x,
+		  int			mask_y,
+		  int			dst_x,
+		  int			dst_y,
+		  unsigned int		width,
+		  unsigned int		height)
+{
+    cairo_image_surface_t *dst = _dst;
+    cairo_image_source_t *src = (cairo_image_source_t *)abstract_src;
+    cairo_image_source_t *mask = (cairo_image_source_t *)abstract_mask;
+
+    TRACE ((stderr, "%s\n", __FUNCTION__));
+
+    /* Punch the clip out of the destination */
+    TRACE ((stderr, "%s - OUT_REVERSE (mask=%d/%p, dst=%d/%p)\n",
+	    __FUNCTION__,
+	    mask->base.unique_id, mask->pixman_image,
+	    dst->base.unique_id, dst->pixman_image));
+    pixman_image_composite32 (PIXMAN_OP_OUT_REVERSE,
+			      mask->pixman_image, src->pixman_image, dst->pixman_image,
+			      mask_x, mask_y,
+			      0,      0,
+			      dst_x,  dst_y,
+			      width,  height);
+
+    /* Now add the two results together */
+    TRACE ((stderr, "%s - ADD (src=%d/%p, mask=%d/%p, dst=%d/%p)\n",
+	    __FUNCTION__,
+	    src->base.unique_id, src->pixman_image,
+	    mask->base.unique_id, mask->pixman_image,
+	    dst->base.unique_id, dst->pixman_image));
+    pixman_image_composite32 (PIXMAN_OP_ADD,
+			      src->pixman_image, mask->pixman_image, dst->pixman_image,
+			      src_x,  src_y,
+			      mask_x, mask_y,
+			      dst_x,  dst_y,
+			      width,  height);
+    return CAIRO_STATUS_SUCCESS;
+}
+
+static cairo_int_status_t
 composite_boxes (void			*_dst,
 		 cairo_operator_t	op,
 		 cairo_surface_t	*abstract_src,
@@ -684,13 +730,13 @@ composite_traps (void			*_dst,
 	return _cairo_error (CAIRO_STATUS_NO_MEMORY);
 
     _pixman_image_add_traps (mask, extents->x, extents->y, traps);
+
     pixman_image_composite32 (_pixman_operator (op),
                               src->pixman_image, mask, dst->pixman_image,
                               extents->x + src_x, extents->y + src_y,
                               0, 0,
                               extents->x - dst_x, extents->y - dst_y,
                               extents->width, extents->height);
-
     pixman_image_unref (mask);
 
     return  CAIRO_STATUS_SUCCESS;
@@ -961,6 +1007,7 @@ composite_one_glyph (void				*_dst,
 		     int				 dst_y,
 		     cairo_composite_glyphs_info_t	 *info)
 {
+    cairo_image_surface_t *dst_surface = (cairo_image_surface_t *)_dst;
     cairo_image_surface_t *glyph_surface;
     cairo_scaled_glyph_t *scaled_glyph;
     cairo_status_t status;
@@ -980,6 +1027,12 @@ composite_one_glyph (void				*_dst,
     if (glyph_surface->width == 0 || glyph_surface->height == 0)
 	return CAIRO_INT_STATUS_NOTHING_TO_DO;
 
+    if (glyph_surface->format == CAIRO_FORMAT_ARGB32 &&
+        dst_surface->format != CAIRO_FORMAT_ARGB32) {
+	/* FIXME: color glyph */
+	return CAIRO_STATUS_SURFACE_TYPE_MISMATCH;
+    }
+
     /* round glyph locations to the nearest pixel */
     /* XXX: FRAGILE: We're ignoring device_transform scaling here. A bug? */
     x = _cairo_lround (info->glyphs[0].x -
@@ -987,15 +1040,27 @@ composite_one_glyph (void				*_dst,
     y = _cairo_lround (info->glyphs[0].y -
 		       glyph_surface->base.device_transform.y0);
 
-    pixman_image_composite32 (_pixman_operator (op),
-			      ((cairo_image_source_t *)_src)->pixman_image,
-			      glyph_surface->pixman_image,
-			      to_pixman_image (_dst),
-			      x + src_x,  y + src_y,
-			      0, 0,
-			      x - dst_x, y - dst_y,
-			      glyph_surface->width,
-			      glyph_surface->height);
+    if (glyph_surface->format != CAIRO_FORMAT_ARGB32 ||
+	pixman_image_get_component_alpha (glyph_surface->pixman_image))
+	pixman_image_composite32 (_pixman_operator (op),
+				  ((cairo_image_source_t *)_src)->pixman_image,
+				  glyph_surface->pixman_image,
+				  to_pixman_image (_dst),
+				  x + src_x,  y + src_y,
+				  0, 0,
+				  x - dst_x, y - dst_y,
+				  glyph_surface->width,
+				  glyph_surface->height);
+    else /* color glyph */
+	pixman_image_composite32 (_pixman_operator (op),
+				  glyph_surface->pixman_image,
+				  NULL,
+				  to_pixman_image (_dst),
+				  0, 0,
+				  x + src_x,  y + src_y,
+				  x - dst_x, y - dst_y,
+				  glyph_surface->width,
+				  glyph_surface->height);
 
     return CAIRO_INT_STATUS_SUCCESS;
 }
@@ -1018,6 +1083,7 @@ composite_glyphs_via_mask (void				*_dst,
     pixman_format_code_t format;
     cairo_status_t status;
     int i;
+    cairo_bool_t component_alpha = FALSE;
 
     TRACE ((stderr, "%s\n", __FUNCTION__));
 
@@ -1091,6 +1157,8 @@ composite_glyphs_via_mask (void				*_dst,
 	}
 
 	glyph_surface = scaled_glyph->surface;
+	if (! component_alpha)
+	    component_alpha = pixman_image_get_component_alpha (glyph_surface->pixman_image);
 	if (glyph_surface->width && glyph_surface->height) {
 	    if (glyph_surface->base.content & CAIRO_CONTENT_COLOR &&
 		format == PIXMAN_a8) {
@@ -1145,17 +1213,25 @@ composite_glyphs_via_mask (void				*_dst,
 	}
     }
 
-    if (format == PIXMAN_a8r8g8b8)
+    if (format == PIXMAN_a8r8g8b8 && component_alpha)
 	pixman_image_set_component_alpha (mask, TRUE);
 
-    pixman_image_composite32 (_pixman_operator (op),
-			      ((cairo_image_source_t *)_src)->pixman_image,
-			      mask,
-			      to_pixman_image (_dst),
-			      info->extents.x + src_x, info->extents.y + src_y,
-			      0, 0,
-			      info->extents.x - dst_x, info->extents.y - dst_y,
-			      info->extents.width, info->extents.height);
+    if (format != PIXMAN_a8r8g8b8 || component_alpha)
+        pixman_image_composite32 (_pixman_operator (op),
+			          ((cairo_image_source_t *)_src)->pixman_image,
+			          mask,
+			          to_pixman_image (_dst),
+			          info->extents.x + src_x, info->extents.y + src_y,
+			          0, 0,
+			          info->extents.x - dst_x, info->extents.y - dst_y,
+			          info->extents.width, info->extents.height);
+    else /* color glyph */
+        pixman_image_composite32 (_pixman_operator (op), mask, NULL,
+			          to_pixman_image (_dst),
+				  0, 0,
+			          info->extents.x + src_x, info->extents.y + src_y,
+			          info->extents.x - dst_x, info->extents.y - dst_y,
+			          info->extents.width, info->extents.height);
     pixman_image_unref (mask);
     pixman_image_unref (white);
 
@@ -1176,6 +1252,7 @@ composite_glyphs (void				*_dst,
     pixman_image_t *dst, *src;
     cairo_status_t status;
     int i;
+    cairo_image_surface_t *dst_surface = (cairo_image_surface_t *)_dst;
 
     TRACE ((stderr, "%s\n", __FUNCTION__));
 
@@ -1184,7 +1261,7 @@ composite_glyphs (void				*_dst,
 	return composite_one_glyph(_dst, op, _src, src_x, src_y, dst_x, dst_y, info);
 
     /* XXX */
-    if (0 && info->use_mask)
+    if (info->use_mask)
 	return composite_glyphs_via_mask(_dst, op, _src, src_x, src_y, dst_x, dst_y, info);
 
     op = _pixman_operator (op);
@@ -1216,6 +1293,12 @@ composite_glyphs (void				*_dst,
 	}
 
 	glyph_surface = scaled_glyph->surface;
+	if (glyph_surface->format == CAIRO_FORMAT_ARGB32 &&
+            dst_surface->format != CAIRO_FORMAT_ARGB32) {
+	    /* FIXME: color glyph */
+	    return CAIRO_STATUS_SURFACE_TYPE_MISMATCH;
+	}
+
 	if (glyph_surface->width && glyph_surface->height) {
 	    /* round glyph locations to the nearest pixel */
 	    /* XXX: FRAGILE: We're ignoring device_transform scaling here. A bug? */
@@ -1270,6 +1353,7 @@ _cairo_image_traps_compositor_get (void)
 	compositor.check_composite = check_composite;
 	compositor.composite = composite;
 	compositor.lerp = lerp;
+	compositor.lerp_color_glyph = lerp_color_glyph;
 	//compositor.check_composite_boxes = check_composite_boxes;
 	compositor.composite_boxes = composite_boxes;
 	//compositor.check_composite_traps = check_composite_traps;
@@ -1303,6 +1387,7 @@ _cairo_image_mask_compositor_get (void)
 	compositor.check_composite = check_composite;
 	compositor.composite = composite;
 	//compositor.lerp = lerp;
+	//compositor.lerp_color_glyph = lerp_color_glyph;
 	//compositor.check_composite_boxes = check_composite_boxes;
 	compositor.composite_boxes = composite_boxes;
 	compositor.check_composite_glyphs = check_composite_glyphs;

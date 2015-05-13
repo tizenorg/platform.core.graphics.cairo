@@ -1128,7 +1128,7 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
     int format = CAIRO_FORMAT_A8;
     int stride;
     cairo_image_surface_t *image;
-    cairo_bool_t component_alpha = FALSE;
+    cairo_bool_t component_alpha = TRUE;
 
     width = bitmap->width;
     height = bitmap->rows;
@@ -1209,15 +1209,33 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 
 	    format = CAIRO_FORMAT_A8;
 	} else {
-	    data = bitmap->buffer;
-	    stride = bitmap->pitch;
-	    format = CAIRO_FORMAT_ARGB32;
-	    component_alpha = TRUE;
+	    /* color glyph is rendered as bitmap, does not come from
+	     * _fill_xrender_bitmap */
+	    if (! own_buffer) {
+		stride = bitmap->pitch;
+		data = _cairo_malloc_ab (height, stride);
+		if (!data)
+		    return _cairo_error (CAIRO_STATUS_NO_MEMORY);
+
+		memcpy (data, bitmap->buffer, stride * height);
+		format = CAIRO_FORMAT_A8;
+	    } else {
+		/* if we get there, the  data from the source bitmap
+		 * really comes from _fill_xrender_bitmap, and is
+		 * made of 32-bit ARGB or ABGR values */
+		assert (own_buffer != 0);
+		assert (bitmap->pixel_mode != FT_PIXEL_MODE_GRAY);
+
+		data = bitmap->buffer;
+		stride = bitmap->pitch;
+		format = CAIRO_FORMAT_ARGB32;
+	    }
 	}
 	break;
-#ifdef FT_LOAD_COLOR
+    // color font
     case FT_PIXEL_MODE_BGRA:
-	stride = width * 4;
+	stride = bitmap->pitch;
+
 	if (own_buffer) {
 	    data = bitmap->buffer;
 	} else {
@@ -1227,9 +1245,10 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 
 	    memcpy (data, bitmap->buffer, stride * height);
 	}
+
 	format = CAIRO_FORMAT_ARGB32;
-	break;
-#endif
+	component_alpha = FALSE;
+        break;
     case FT_PIXEL_MODE_GRAY2:
     case FT_PIXEL_MODE_GRAY4:
     convert:
@@ -1290,7 +1309,7 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 	return (*surface)->base.status;
     }
 
-    if (component_alpha)
+    if (format == CAIRO_FORMAT_ARGB32 && component_alpha)
 	pixman_image_set_component_alpha (image->pixman_image, TRUE);
 
     _cairo_image_surface_assume_ownership_of_data (image);
@@ -1599,11 +1618,7 @@ _transform_glyph_bitmap (cairo_matrix_t         * shape,
     if (unlikely (status))
 	return status;
 
-    if ((*surface)->format == CAIRO_FORMAT_ARGB32 &&
-        !pixman_image_get_component_alpha ((*surface)->pixman_image))
-      image = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);
-    else
-      image = cairo_image_surface_create (CAIRO_FORMAT_A8, width, height);
+    image = cairo_image_surface_create ((*surface)->format, width, height);
     if (unlikely (image->status))
 	return image->status;
 

@@ -173,7 +173,8 @@ static cairo_int_status_t
 combine_clip_as_traps (const cairo_traps_compositor_t *compositor,
 		       cairo_surface_t *mask,
 		       const cairo_clip_t *clip,
-		       const cairo_rectangle_int_t *extents)
+		       const cairo_rectangle_int_t *extents,
+		       const cairo_bool_t draw_color_glyph)
 {
     cairo_polygon_t polygon;
     cairo_fill_rule_t fill_rule;
@@ -208,11 +209,18 @@ combine_clip_as_traps (const cairo_traps_compositor_t *compositor,
 	return src->status;
     }
 
-    status = compositor->composite_traps (mask, CAIRO_OPERATOR_IN, src,
-					  src_x, src_y,
-					  extents->x, extents->y,
-					  extents,
-					  antialias, &traps);
+    if (draw_color_glyph)
+	status = compositor->composite_traps (mask, CAIRO_OPERATOR_IN, mask,
+					      src_x, src_y,
+					      extents->x, extents->y,
+					      extents,
+					      antialias, &traps);
+    else
+	status = compositor->composite_traps (mask, CAIRO_OPERATOR_IN, src,
+					      src_x, src_y,
+					      extents->x, extents->y,
+					      extents,
+					      antialias, &traps);
 
     _cairo_traps_extents (&traps, &box);
     _cairo_box_round_to_rectangle (&box, &fixup);
@@ -428,6 +436,7 @@ create_composite_mask (const cairo_traps_compositor_t *compositor,
     cairo_surface_t *surface, *src;
     cairo_int_status_t status;
     int src_x, src_y;
+    cairo_bool_t draw_color_glyph = FALSE;
 
     TRACE ((stderr, "%s\n", __FUNCTION__));
 
@@ -438,6 +447,11 @@ create_composite_mask (const cairo_traps_compositor_t *compositor,
     if (unlikely (surface->status))
 	return surface;
 
+    /* FIXME: This is more like an ugly hack and wasteful.  Reason
+       for this code is that we don't know whether the mask surface
+       should alpha-only or argb32 before we render a glyph.
+     */
+redo:
     src = compositor->pattern_to_surface (surface,
 					  &_cairo_pattern_white.base,
 					  FALSE,
@@ -491,13 +505,29 @@ create_composite_mask (const cairo_traps_compositor_t *compositor,
 			CAIRO_OPERATOR_ADD, src, src_x, src_y,
 			extents->bounded.x, extents->bounded.y,
 			&extents->bounded, NULL);
-    if (unlikely (status))
-	goto error;
+    if (unlikely (status)) {
+	if (cairo_surface_get_content (surface) == CAIRO_CONTENT_COLOR_ALPHA)
+	    goto error;
+	else {
+	    compositor->release (surface);
+	    cairo_surface_destroy (surface);
+	    cairo_surface_destroy (src);
+	    surface = _cairo_surface_create_similar_scratch (dst, CAIRO_CONTENT_COLOR_ALPHA,
+						     extents->bounded.width,
+						     extents->bounded.height);
+	    if (unlikely (surface->status))
+		return surface;
+	    /* we are drawing color glyph */
+	    draw_color_glyph = TRUE;
+	    goto redo;
+	}
+    }
 
     surface->is_clear = FALSE;
     if (extents->clip->path != NULL) {
 	status = combine_clip_as_traps (compositor, surface,
-					extents->clip, &extents->bounded);
+					extents->clip, &extents->bounded,
+					draw_color_glyph);
 	if (status == CAIRO_INT_STATUS_UNSUPPORTED) {
 	    status = _cairo_clip_combine_with_surface (extents->clip, surface,
 						       extents->bounded.x,
@@ -554,21 +584,31 @@ clip_and_composite_with_mask (const cairo_traps_compositor_t *compositor,
     if (mask->is_clear)
 	goto skip;
 
-    if (src != NULL || dst->content != CAIRO_CONTENT_ALPHA) {
-	compositor->composite (dst, op, src, mask,
-			       extents->bounded.x + src_x,
-			       extents->bounded.y + src_y,
-			       0, 0,
-			       extents->bounded.x,      extents->bounded.y,
-			       extents->bounded.width,  extents->bounded.height);
-    } else {
+    if (mask->content == CAIRO_CONTENT_ALPHA) {
+	/* This is real mask */
+	if (src != NULL || dst->content != CAIRO_CONTENT_ALPHA) {
+	    compositor->composite (dst, op, src, mask,
+				   extents->bounded.x + src_x,
+				   extents->bounded.y + src_y,
+				   0, 0,
+				   extents->bounded.x, extents->bounded.y,
+				   extents->bounded.width, extents->bounded.height);
+	} else {
+	    compositor->composite (dst, op, mask, NULL,
+				   0, 0,
+				   0, 0,
+				   extents->bounded.x,      extents->bounded.y,
+				   extents->bounded.width,  extents->bounded.height);
+	}
+    }
+    else {
 	compositor->composite (dst, op, mask, NULL,
 			       0, 0,
-			       0, 0,
-			       extents->bounded.x,      extents->bounded.y,
-			       extents->bounded.width,  extents->bounded.height);
+			       extents->bounded.x + src_x,
+			       extents->bounded.y + src_y,
+			       extents->bounded.x, extents->bounded.y,
+			       extents->bounded.width, extents->bounded.height);
     }
-
 skip:
     cairo_surface_destroy (mask);
     return CAIRO_STATUS_SUCCESS;
@@ -662,6 +702,15 @@ clip_and_composite_source (const cairo_traps_compositor_t	*compositor,
 			   const cairo_composite_rectangles_t	*extents)
 {
     cairo_surface_t *mask;
+    /* create a white color pattern */
+    cairo_pattern_t *white_pattern = _cairo_pattern_create_solid (CAIRO_COLOR_WHITE);
+    cairo_surface_t *white_mask =
+	compositor->pattern_to_surface (dst, white_pattern, TRUE,
+					  &extents->bounded,
+					  &extents->source_sample_area,
+					  &src_x, &src_y);
+    if (unlikely (white_mask->status))
+	goto skip;
 
     TRACE ((stderr, "%s\n", __FUNCTION__));
 
@@ -682,15 +731,24 @@ clip_and_composite_source (const cairo_traps_compositor_t	*compositor,
 			       extents->bounded.x,      extents->bounded.y,
 			       extents->bounded.width,  extents->bounded.height);
     } else {
-	compositor->lerp (dst, src, mask,
-			  extents->bounded.x + src_x, extents->bounded.y + src_y,
-			  0, 0,
-			  extents->bounded.x,     extents->bounded.y,
-			  extents->bounded.width, extents->bounded.height);
+	if (mask->content == CAIRO_CONTENT_ALPHA)
+	    compositor->lerp (dst, src, mask,
+			      extents->bounded.x + src_x, extents->bounded.y + src_y,
+			      0, 0,
+			      extents->bounded.x,     extents->bounded.y,
+			      extents->bounded.width, extents->bounded.height);
+	else
+	    compositor->lerp_color_glyph (dst, mask, white_mask,
+					  0, 0,
+					  extents->bounded.x + src_x, extents->bounded.y + src_y,
+					  extents->bounded.x,     extents->bounded.y,
+					  extents->bounded.width, extents->bounded.height);
     }
 
 skip:
     cairo_surface_destroy (mask);
+    cairo_surface_destroy (white_mask);
+    cairo_pattern_destroy (white_pattern);
 
     return CAIRO_STATUS_SUCCESS;
 }
