@@ -94,6 +94,7 @@ typedef struct _cairo_egl_context {
     EGLSurface current_surface;
 
     EGLContext previous_context;
+    EGLSurface previous_surface;
 
 } cairo_egl_context_t;
 
@@ -108,7 +109,8 @@ static cairo_bool_t
 _context_acquisition_changed_egl_state (cairo_egl_context_t *ctx,
 					EGLSurface current_surface)
 {
-    return ctx->previous_context != ctx->context;
+    return ctx->previous_context != ctx->context ||
+           ctx->previous_surface != current_surface;
 }
 
 static EGLSurface
@@ -126,6 +128,7 @@ static void
 _egl_query_current_state (cairo_egl_context_t *ctx)
 {
     ctx->previous_context = eglGetCurrentContext ();
+    ctx->previous_surface = eglGetCurrentSurface (EGL_DRAW);
 }
 
 static void
