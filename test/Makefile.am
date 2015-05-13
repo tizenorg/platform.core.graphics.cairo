@@ -16,10 +16,6 @@ test_sources += $(ft_font_test_sources)
 endif
 endif
 
-if CAIRO_HAS_GL_SURFACE
-test_sources += $(gl_surface_test_sources)
-endif
-
 if CAIRO_HAS_EGL_FUNCTIONS
 test_sources += $(egl_surface_test_sources)
 endif

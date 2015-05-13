@@ -3,6 +3,7 @@
  * Copyright © 2009 Eric Anholt
  * Copyright © 2009 Chris Wilson
  * Copyright © 2005,2010 Red Hat, Inc
+ * Copyright © 2011,2015 Samsung Research America, Inc - Silicon Valley
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -36,6 +37,7 @@
  *	Carl Worth <cworth@cworth.org>
  *	Chris Wilson <chris@chris-wilson.co.uk>
  *	Eric Anholt <eric@anholt.net>
+ *	Henry Songt <hsong@sisa.samsung.com>
  */
 
 #ifndef CAIRO_GL_GRADIENT_PRIVATE_H
@@ -52,8 +54,13 @@
 #include "cairo-gl.h"
 
 #if CAIRO_HAS_GL_SURFACE
+#if CAIRO_HAS_CGL_FUNCTIONS
+#include <OpenGL/gl.h>
+#include <OpenGL/glext.h>
+#else
 #include <GL/gl.h>
 #include <GL/glext.h>
+#endif
 #elif CAIRO_HAS_GLESV2_SURFACE
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>

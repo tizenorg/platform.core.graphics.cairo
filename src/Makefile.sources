@@ -265,6 +265,7 @@ cairo_sources += $(_cairo_font_subset_sources)
 cairo_egl_sources =
 cairo_glx_sources =
 cairo_wgl_sources =
+cairo_cgl_sources =
 
 _cairo_pdf_operators_private = cairo-pdf-operators-private.h cairo-pdf-shading-private.h
 _cairo_pdf_operators_sources = cairo-pdf-operators.c cairo-pdf-shading.c
@@ -445,6 +446,7 @@ cairo_egl_sources += cairo-egl-context.c
 cairo_glx_sources += cairo-glx-context.c
 cairo_wgl_sources += cairo-wgl-context.c
 cairo_evasgl_sources += cairo-evas-gl-context.c
+cairo_cgl_sources += cairo-cgl-context.c
 
 cairo_directfb_headers = cairo-directfb.h
 cairo_directfb_sources = cairo-directfb-surface.c

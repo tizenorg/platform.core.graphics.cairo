@@ -348,20 +348,21 @@ CAIRO_ENABLE_SURFACE_BACKEND(gl, OpenGL, no, [
   gl_REQUIRES="gl"
   PKG_CHECK_MODULES(gl, $gl_REQUIRES,, [
 	  dnl Fallback to searching for headers
-	  AC_CHECK_HEADER(GL/gl.h,, [use_gl="no (gl.pc nor OpenGL headers not found)"])
+	  AC_CHECK_HEADER([GL/gl.h, OpenGL/gl.h], [use_gl="no (gl.pc nor OpenGL headers not found)"])
 	  if test "x$use_gl" = "xyes"; then
 	      gl_NONPKGCONFIG_CFLAGS=
-	      gl_NONPKGCONFIG_LIBS="-lGL"
+	      gl_NONPKGCONFIG_LIBS=
 	  fi])
 
   if test "x$have_dl" = "xyes" -a "x$have_dlsym" = "xyes"; then
-    gl_LIBS="$gl_LIBS -ldl"
+    gl_LIBS="-ldl"
   fi
 
   need_glx_functions=yes
   need_wgl_functions=yes
   need_egl_functions=yes
   need_evasgl_functions=yes
+  need_cgl_functions=yes
 ])
 
 dnl ===========================================================================
@@ -488,8 +489,24 @@ CAIRO_ENABLE_FUNCTIONS(glx, GLX, auto, [
     glx_NONPKGCONFIG_CFLAGS=
     glx_NONPKGCONFIG_LIBS="-lGL"
     CFLAGS="$save_CFLAGS"
+    need_cgl_functions="no"
   else
       use_glx="no (not required by any backend)"
+  fi
+])
+
+CAIRO_ENABLE_FUNCTIONS(cgl, CGL, auto, [
+  if test "x$need_cgl_functions" = "xyes"; then
+    save_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $gl_CFLAGS $gl_NONPKGCONFIG_CFLAGS"
+    AC_CHECK_HEADER(OpenGL/gl.h,, [use_gl="no (CGL headers not found)"])
+    cgl_LIBS="-Xlinker -framework -Xlinker OpenGL"
+    cgl_NONPKGCONFIG_CFLAGS=
+    cgl_NONPKGCONFIG_LIBS=
+    CFLAGS="$save_CFLAGS"
+    need_glx_functions="no"
+  else
+      use_cgl="no (not required by any backend)"
   fi
 ])
 

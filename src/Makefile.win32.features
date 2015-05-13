@@ -437,6 +437,22 @@ ifeq ($(CAIRO_HAS_GLX_FUNCTIONS),1)
 enabled_cairo_pkgconf += cairo-glx.pc
 endif
 
+supported_cairo_headers += $(cairo_cgl_headers)
+all_cairo_headers += $(cairo_cgl_headers)
+all_cairo_private += $(cairo_cgl_private)
+all_cairo_cxx_sources += $(cairo_cgl_cxx_sources)
+all_cairo_sources += $(cairo_cgl_sources)
+ifeq ($(CAIRO_HAS_CGL_FUNCTIONS),1)
+enabled_cairo_headers += $(cairo_cgl_headers)
+enabled_cairo_private += $(cairo_cgl_private)
+enabled_cairo_cxx_sources += $(cairo_cgl_cxx_sources)
+enabled_cairo_sources += $(cairo_cgl_sources)
+endif
+all_cairo_pkgconf += cairo-cgl.pc
+ifeq ($(CAIRO_HAS_CGL_FUNCTIONS),1)
+enabled_cairo_pkgconf += cairo-cgl.pc
+endif
+
 supported_cairo_headers += $(cairo_wgl_headers)
 all_cairo_headers += $(cairo_wgl_headers)
 all_cairo_private += $(cairo_wgl_private)
