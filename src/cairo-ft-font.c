@@ -2261,7 +2261,8 @@ _cairo_ft_scaled_glyph_init (void			*abstract_font,
     /* load_flags |= FT_LOAD_COLOR; */
     
     /* Color-glyph support */
-    load_flags |= FT_LOAD_COLOR;
+    if (scaled_font->ft_options.base.color == CAIRO_FONT_COLOR_DEFAULT)
+	load_flags |= FT_LOAD_COLOR;
 #endif
 
     error = FT_Load_Glyph (face,

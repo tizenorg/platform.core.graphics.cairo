@@ -1898,6 +1898,7 @@ slim_hidden_proto (cairo_font_options_equal);
 slim_hidden_proto (cairo_font_options_hash);
 slim_hidden_proto (cairo_font_options_merge);
 slim_hidden_proto (cairo_font_options_set_antialias);
+slim_hidden_proto (cairo_font_options_set_font_color);
 slim_hidden_proto (cairo_font_options_set_hint_metrics);
 slim_hidden_proto (cairo_font_options_set_hint_style);
 slim_hidden_proto (cairo_font_options_set_subpixel_order);

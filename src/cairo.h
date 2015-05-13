@@ -1349,6 +1349,22 @@ typedef enum _cairo_hint_metrics {
 } cairo_hint_metrics_t;
 
 /**
+ * cairo_font_color_t:
+ * @CAIRO_FONT_COLOR_DEFAULT: default color, if the font has color,
+ *  use font's color, otherwise, use user specified, since 1.12.14
+ * @CAIRO_FONT_COLOR_USER: always uses user's color, since 1.0
+ *
+ * When rendering text, specifies whether to use user's color set
+ * by cairo_set_source_XXXX() or use glyph's builtin color
+ *
+ * Since: 1.4
+ **/
+typedef enum _cairo_font_color {
+    CAIRO_FONT_COLOR_DEFAULT,
+    CAIRO_FONT_COLOR_USER
+} cairo_font_color_t;
+
+/**
  * cairo_font_options_t:
  *
  * An opaque structure holding all options that are used when
@@ -1417,6 +1433,12 @@ cairo_font_options_set_hint_metrics (cairo_font_options_t *options,
 				     cairo_hint_metrics_t  hint_metrics);
 cairo_public cairo_hint_metrics_t
 cairo_font_options_get_hint_metrics (const cairo_font_options_t *options);
+
+cairo_public void
+cairo_font_options_set_font_color (cairo_font_options_t *options,
+				   cairo_font_color_t  font_color);
+cairo_public cairo_font_color_t
+cairo_font_options_get_font_color (const cairo_font_options_t *options);
 
 /* This interface is for dealing with text as text, not caring about the
    font object inside the the cairo_t. */
