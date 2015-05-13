@@ -254,7 +254,7 @@ lerp (void			*dst,
     cairo_int_status_t status;
 
     /* we could avoid some repetition... */
-    status = composite (dst, CAIRO_OPERATOR_DEST_OUT, mask, src,
+    status = composite (dst, CAIRO_OPERATOR_DEST_OUT, mask, NULL,
 			mask_x, mask_y,
 			0, 0,
 			dst_x, dst_y,
