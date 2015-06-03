@@ -1217,6 +1217,7 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 	}
 	break;
 	// color font
+	/*
     case FT_PIXEL_MODE_BGRA:
 		stride = bitmap->pitch;
 		if (own_buffer) {
@@ -1232,6 +1233,7 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 		format = CAIRO_FORMAT_ARGB32;
 		component_alpha = FALSE;
 	break;
+	*/
     case FT_PIXEL_MODE_GRAY2:
     case FT_PIXEL_MODE_GRAY4:
 	/* These could be triggered by very rare types of TrueType fonts */
