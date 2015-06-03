@@ -11,9 +11,9 @@ Source1001: packaging/cairo.manifest
 
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
-BuildRequires:  pkgconfig(xrender)
-BuildRequires:  pkgconfig(x11)
-BuildRequires:  pkgconfig(xext)
+#BuildRequires:  pkgconfig(xrender)
+#BuildRequires:  pkgconfig(x11)
+#BuildRequires:  pkgconfig(xext)
 BuildRequires:  pkgconfig(libpng)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(pixman-1)
@@ -21,11 +21,11 @@ BuildRequires:  pkgconfig(freetype2)
 BuildRequires:  pkgconfig(fontconfig)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(sm)
-BuildRequires:  pkgconfig(xt)
-BuildRequires:  pkgconfig(xcb)
-BuildRequires:  pkgconfig(xcb-render)
+#BuildRequires:  pkgconfig(xt)
+#BuildRequires:  pkgconfig(xcb)
+#BuildRequires:  pkgconfig(xcb-render)
 #BuildRequires:  pkgconfig(xcb-renderutil)
-BuildRequires:  pkgconfig(xcb-shm)
+#BuildRequires:  pkgconfig(xcb-shm)
 BuildRequires:  pkgconfig(opengl-es-20)
 BuildRequires:  pkgconfig(ecore)
 BuildRequires:  pkgconfig(evas)
@@ -56,18 +56,18 @@ NOCONFIGURE=1 ./autogen.sh
 %configure --disable-static \
     --disable-win32 \
     --enable-directfb=no \
-    --enable-xlib \
-    --with-x \
+    --enable-xlib=no \
+    --with-x=no \
     --x-includes=%{_includedir} \
     --x-libraries=%{_libdir} \
     --disable-gtk-doc \
 %ifarch %ix86
-    --enable-xcb \
+    --enable-xcb=no \
     --enable-egl=no \
     --enable-glesv2=no \
     --enable-evasgl=yes \
 %else
-    --enable-xcb \
+    --enable-xcb=no \
     --enable-egl=yes \
     --enable-glesv2=yes \
     --enable-evasgl=yes
