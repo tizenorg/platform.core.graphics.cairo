@@ -295,7 +295,7 @@ cairo_evas_gl_device_create (Evas_GL *evas_gl,
     ctx->dummy_surface = evas_gl_pbuffer_surface_create (ctx->evas_gl,
 							 evas_cfg,
 							 1, 1, NULL);
-    //evas_gl_config_free (evas_cfg);
+    evas_gl_config_free (evas_cfg);
 
     if (ctx->dummy_surface == NULL) {
         free (ctx);
