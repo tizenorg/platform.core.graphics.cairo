@@ -118,7 +118,7 @@ Group:          Development/Libraries
 Requires:       libcairo = %{version}
 Requires:       libcairo-gobject = %{version}
 Requires:       libcairo-script-interpreter = %{version}
-Requires:       pixman_devel
+Requires:       pixman-devel
 
 %description devel
 This package contains all files necessary to build binaries using
