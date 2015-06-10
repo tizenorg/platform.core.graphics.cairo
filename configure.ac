@@ -397,7 +397,7 @@ CAIRO_ENABLE_SURFACE_BACKEND(evasgl, EvasGL, no, [
 
 dnl ===========================================================================
 CAIRO_ENABLE_SURFACE_BACKEND(glesv2, OpenGLESv2, no, [
-  glesv2_REQUIRES="gles20"
+  glesv2_REQUIRES="glesv2"
   PKG_CHECK_MODULES(glesv2, $glesv2_REQUIRES,, [
 	  dnl Fallback to searching for headers
 	  AC_CHECK_HEADER(GLES2/gl2.h,, [use_glesv2="no (glesv2.pc nor OpenGL ES 2.0 headers not found)"])

@@ -170,11 +170,11 @@ NOCONFIGURE=1 ./autogen.sh
 %else
     --enable-xlib \
 %if %{with cairo_xcb_backend}
-    --enable-xcb=yes \
+    --enable-xcb \
 %endif
 %endif
-#    --disable-gtk-doc \
-#    --disable-static
+    --disable-gtk-doc \
+    --disable-static
 make %{?_smp_mflags} V=1
 
 %install
