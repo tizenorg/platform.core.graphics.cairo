@@ -802,8 +802,6 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
     GLbitfield mask;
 
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP) {
-	stencil_test_enabled = ctx->states_cache.stencil_test_enabled;
-	scissor_test_enabled = ctx->states_cache.scissor_test_enabled;
 
 	has_stencil_cache = surface->clip_on_stencil_buffer ? TRUE : FALSE;
 	mask = GL_COLOR_BUFFER_BIT;
@@ -829,10 +827,10 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
 #if CAIRO_HAS_GL_SURFACE || CAIRO_HAS_EVASGL_SURFACE
     /* we must disable scissor and stencil test */
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP) {
-	stencil_test_enabled = glIsEnabled (GL_STENCIL_TEST);
-	scissor_test_enabled = glIsEnabled (GL_SCISSOR_TEST);
-    	glDisable (GL_STENCIL_TEST);
-    	glDisable (GL_SCISSOR_TEST);
+	stencil_test_enabled = ctx->states_cache.stencil_test_enabled;
+	scissor_test_enabled = ctx->states_cache.scissor_test_enabled;
+	_disable_stencil_buffer (ctx);  
+	_disable_scissor_buffer (ctx);
 
 	ctx->dispatch.Enable (GL_MULTISAMPLE);
 
@@ -857,9 +855,9 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP) {
 	/* re-enable stencil and scissor test */
 	if (stencil_test_enabled)
-	    glEnable (GL_STENCIL_TEST);
+	    _enable_stencil_buffer (ctx);
 	if (scissor_test_enabled)
-	    glEnable (GL_SCISSOR_TEST);
+	    _enable_scissor_buffer (ctx);
     }
 #endif
 }
@@ -890,10 +888,10 @@ bind_singlesample_framebuffer (cairo_gl_context_t *ctx,
 
     _cairo_gl_composite_flush (ctx);
 
-    stencil_test_enabled = glIsEnabled (GL_STENCIL_TEST);
-    scissor_test_enabled = glIsEnabled (GL_SCISSOR_TEST);
-    glDisable (GL_STENCIL_TEST);
-    glDisable (GL_SCISSOR_TEST);
+    stencil_test_enabled = ctx->states_cache.stencil_test_enabled;
+    scissor_test_enabled = ctx->states_cache.scissor_test_enabled;
+    _disable_stencil_buffer (ctx);  
+    _disable_scissor_buffer (ctx);
 
 #if CAIRO_HAS_GL_SURFACE || CAIRO_HAS_EVASGL_FLAVOR
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP)
@@ -930,9 +928,9 @@ bind_singlesample_framebuffer (cairo_gl_context_t *ctx,
     
     /* re-enable stencil and scissor test */
     if (stencil_test_enabled)
-	glEnable (GL_STENCIL_TEST);
+	_enable_stencil_buffer (ctx);
     if (scissor_test_enabled)
-	glEnable (GL_SCISSOR_TEST);
+	_enable_scissor_buffer (ctx);
 }
 
 void
