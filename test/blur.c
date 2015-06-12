@@ -29,12 +29,17 @@
 /* This test exercises gaussian blur rendering
  */
 
+/* When we build only for backends other than gl,
+   include <cairo-gl.h> in blur.c will give errors.
+*/
+#if 0
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 #include <cairo.h>
 #include <cairo-gl.h>
+#endif
 
 #include "cairo-test.h"
 
