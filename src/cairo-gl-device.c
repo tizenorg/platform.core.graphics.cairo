@@ -365,7 +365,7 @@ _cairo_gl_context_init (cairo_gl_context_t *ctx)
 #endif
 
 #if CAIRO_HAS_GLESV3_SURFACE || CAIRO_HAS_EVASGL_SURFACE
-    if (ctx->msaa_type === CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE &&
+    if (ctx->msaa_type == CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE &&
 	is_gles && ctx->has_packed_depth_stencil) {
 	ctx->dispatch.GetIntegerv(GL_MAX_SAMPLES, &ctx->num_samples);
 	/* this is work around for evasgl.  At this moment, if
