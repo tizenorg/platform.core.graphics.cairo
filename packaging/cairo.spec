@@ -149,15 +149,9 @@ NOCONFIGURE=1 ./autogen.sh
     --enable-fc \
     --enable-ft \
 %if %{with cairo_gl_backend}
-%ifarch %ix86
-    --enable-egl=no \
-    --enable-glesv2=no \
-    --enable-evasgl=yes \
-%else
     --enable-egl=yes \
     --enable-glesv2=yes \
     --enable-evasgl=yes \
-%endif
 %endif
     --enable-ps \
     --enable-pdf \
