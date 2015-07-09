@@ -1106,14 +1106,18 @@ cairo_gl_device_set_thread_aware (cairo_device_t	*device,
 void _cairo_gl_context_reset (cairo_gl_context_t *ctx)
 {
     cairo_gl_shader_t *shader = ctx->current_shader;
+    GLint current_program;
+
     /* reset current shader, this is because if cairo shares a same
      * context other extern libraries or applications, the current
      * program may well be changed, in this case, we must set cairo
      * to use cairo program
      */
-    ctx->current_shader = NULL;
-    if (shader)
-	_cairo_gl_set_shader (ctx, shader);
+    if (shader) {
+	ctx->dispatch.GetIntegerv (GL_CURRENT_PROGRAM, &current_program);
+	if ((GLint)(ctx->current_shader->program) != current_program) 
+	    _cairo_gl_set_shader (ctx, shader);
+    }
 
     ctx->states_cache.viewport_box.width = 0;
     ctx->states_cache.viewport_box.height = 0;
