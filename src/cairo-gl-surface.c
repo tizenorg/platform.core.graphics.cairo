@@ -1345,7 +1345,10 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	}
 	else
 	{
-	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, cpp);
+	    /* When cpp != 4, setting GL_UNPACK_ALIGNMENT to cpp
+	       causes many failures in cairo tests with respect to 
+	       GLESV2 */
+	    ctx->dispatch.PixelStorei (GL_UNPACK_ALIGNMENT, 4);
 	    if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP ||
 		ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3)
 		ctx->dispatch.PixelStorei (GL_UNPACK_ROW_LENGTH, src->stride / cpp);
