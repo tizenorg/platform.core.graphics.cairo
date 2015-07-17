@@ -45,6 +45,12 @@ extern void glFinish (void);
 #include <GLES3/gl3.h>
 #endif
 
+// For Wayland-egl
+#ifdef HAVE_WAYLAND
+#include <wayland-egl.h>
+#include <wayland-client.h>
+#endif
+
 static const cairo_user_data_key_t gl_closure_key;
 
 typedef struct _egl_target_closure {
@@ -110,7 +116,15 @@ _cairo_boilerplate_egl_create_surface (const char		 *name,
     gltc = xcalloc (1, sizeof (egl_target_closure_t));
     *closure = gltc;
 
+#ifdef HAVE_WAYLAND
+    static struct wl_display *display;
+    display = wl_display_connect (NULL);
+    struct wl_registry *registry = wl_display_get_registry (display);
+    wl_display_dispatch (display);
+    gltc->dpy = eglGetDisplay (display);
+#else
     gltc->dpy = eglGetDisplay (EGL_DEFAULT_DISPLAY);
+#endif
 
     if (! eglInitialize (gltc->dpy, &major, &minor)) {
 	free (gltc);
