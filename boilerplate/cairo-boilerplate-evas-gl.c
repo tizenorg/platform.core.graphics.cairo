@@ -89,7 +89,13 @@ _cairo_boilerplate_evas_gl_create_surface (const char		 *name,
 
     ecore_init ();
     ecore_evas_init ();
+
+#ifdef HAVE_WAYLAND //Wayland (Tizen 3.0)
+    ee = ecore_evas_wayland_egl_new (NULL, 0, 0, 0, ceil (width), ceil (height),EINA_TRUE);
+#else 0
     ee = ecore_evas_gl_x11_new (NULL, 0, 0, 0, ceil (width), ceil (height));;
+#endif
+
     canvas = ecore_evas_get (ee);
 
     gltc = xcalloc (1, sizeof (evas_gl_target_closure_t));
