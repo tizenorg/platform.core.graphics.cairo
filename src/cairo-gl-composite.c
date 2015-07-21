@@ -321,8 +321,8 @@ _cairo_gl_context_setup_operand (cairo_gl_context_t *ctx,
 
 static void
 _cairo_gl_context_setup_spans (cairo_gl_context_t *ctx,
-			       cairo_bool_t        encode_src_as_attribute,
 			       cairo_bool_t        spans_enabled,
+			       cairo_bool_t        encode_src_as_attribute,
 			       unsigned int        vertex_size,
 			       unsigned int        vertex_offset)
 {
@@ -798,12 +798,10 @@ _cairo_gl_set_operands_and_operator (cairo_gl_composite_t *setup,
     if (setup->spans)
 	vertex_size += sizeof (GLfloat);
 
-    if (setup->src.type != CAIRO_GL_OPERAND_CONSTANT ||
-	! setup->src.constant.encode_as_attribute)
+    if (setup->src.type == CAIRO_GL_OPERAND_CONSTANT)
 	_cairo_gl_context_setup_spans (ctx,
 				       setup->spans,
-				       setup->src.type == CAIRO_GL_OPERAND_CONSTANT ||
-				       ! setup->src.constant.encode_as_attribute,
+				       setup->src.constant.encode_as_attribute,
 				       vertex_size,
 				       dst_size + src_size + mask_size);
 
