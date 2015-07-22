@@ -50,6 +50,16 @@ AC_CHECK_LIB(z, compress,
 	 [have_libz="no (requires zlib http://www.gzip.org/zlib/)"])],
 	 [have_libz="no (requires zlib http://www.gzip.org/zlib/)"])
 
+AC_CHECK_LIB(wayland-client, wl_display_connect,
+     [AC_CHECK_HEADER(wayland-client.h, [
+      have_wayland=yes
+      AC_DEFINE(HAVE_WAYLAND, 1, [Define to 1 if you have wayland available])
+      wayland_LIBS="-lwayland-client -lwayland-egl"
+     ],
+     [have_wayland="no (requires ttrace)"])],
+     [have_wayland="no (requires ttraec)"])
+LIBS="$wayland_LIBS $LIBS"
+
 save_LIBS="$LIBS"
 AC_CHECK_LIB(lzo2, lzo2a_decompress,
 	 [AC_CHECK_HEADER(lzo/lzo2a.h, [
