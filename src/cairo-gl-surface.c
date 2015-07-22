@@ -769,7 +769,10 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
     default:
 	ASSERT_NOT_REACHED;
     case CAIRO_CONTENT_COLOR_ALPHA:
-	format = GL_RGBA;
+	if(ctx->can_read_bgra)
+	    format = GL_BGRA;
+	else
+	    format = GL_RGBA;
 	break;
     case CAIRO_CONTENT_ALPHA:
 	/* When using GL_ALPHA, compositing doesn't work properly, but for
@@ -789,7 +792,10 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
 	 * specified.  So, we have to store RGBA, and fill the alpha
 	 * channel with 1 when blending.
 	 */
-	format = GL_RGBA;
+	if(ctx->can_read_bgra)
+	    format = GL_BGRA;
+	else
+	    format = GL_RGBA;
 	break;
     }
 
@@ -1222,8 +1228,10 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	pixman_format = _cairo_is_little_endian () ? PIXMAN_a8b8g8r8 : PIXMAN_r8g8b8a8;
 
 	if (src->base.content != CAIRO_CONTENT_ALPHA) {
-	    if (src->pixman_format != pixman_format)
-		require_conversion = TRUE;
+	    if (src->pixman_format != pixman_format) {
+		if (!ctx->can_read_bgra)
+		    require_conversion = TRUE;
+	    }
 	}
 	else if (dst->base.content != CAIRO_CONTENT_ALPHA)
 	    require_conversion = TRUE;
@@ -1746,9 +1754,10 @@ _cairo_gl_surface_flush (void *abstract_surface, unsigned flags)
       _cairo_gl_composite_flush (ctx);
 
     status = _cairo_gl_surface_resolve_multisampling (surface);
-
+#if 0
     if (ctx->msaa_type != CAIRO_GL_NONE_MULTISAMPLE_TO_TEXTURE)
-        ctx->dispatch.Flush ();
+	ctx->dispatch.Flush ();
+#endif
 
     return _cairo_gl_context_release (ctx, status);
 }
