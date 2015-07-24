@@ -165,58 +165,6 @@ cairo_egl_device_get_context (cairo_device_t *device);
 
 #endif
 
-#if CAIRO_HAS_EVASGL_SURFACE
-#include <Evas_GL.h>
-
-/* Evas_GL.h does not define GLchar */
-typedef char GLchar;
-
-#ifndef GL_DRAW_FRAMEBUFFER
-#define GL_DRAW_FRAMEBUFFER	0x8CA9
-#endif
-
-#ifndef GL_READ_FRAMEBUFFER
-#define GL_READ_FRAMEBUFFER	0x8CA8
-#endif
-
-#ifndef GL_BACK_LEFT
-#define GL_BACK_LEFT		0x402
-#endif
-
-#ifndef GL_DEPTH_STENCIL
-#define GL_DEPTH_STENCIL	0x84F9
-#endif
-
-#ifndef GL_DEPTH24_STENCIL8
-#define GL_DEPTH24_STENCIL8	0x88F0
-#endif
-
-#ifndef GL_MAX_SAMPLES
-#define GL_MAX_SAMPLES		0x8D57
-#endif
-
-#ifndef GL_DEPTH_STENCIL_ATTACHMENT
-#define GL_DEPTH_STENCIL_ATTACHMENT	0x821A
-#endif
-
-cairo_public cairo_device_t *
-cairo_evas_gl_device_create (Evas_GL		*evas_gl,
-			     Evas_GL_Context	*evas_context);
-
-cairo_public cairo_surface_t *
-cairo_gl_surface_create_for_evas_gl (cairo_device_t	*device,
-				     Evas_GL_Surface	*evas_surface,
-				     Evas_GL_Config     *evas_config,
-				     int		 width,
-				     int		 height);
-
-cairo_public Evas_GL *
-cairo_evas_gl_device_get_gl (cairo_device_t *device);
-
-cairo_public Evas_GL_Context *
-cairo_evas_gl_device_get_context (cairo_device_t *device);
-#endif
-
 CAIRO_END_DECLS
 #else  /* CAIRO_HAS_GL_SURFACE */
 # error Cairo was not compiled with support for the GL backend

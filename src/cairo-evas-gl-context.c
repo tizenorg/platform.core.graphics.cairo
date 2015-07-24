@@ -45,6 +45,8 @@
 #include <dlfcn.h>
 #endif
 
+#include "cairo-evas-gl.h"
+
 typedef struct _cairo_evas_gl_context {
     cairo_gl_context_t base;
 
@@ -173,7 +175,7 @@ _cairo_evas_gl_get_proc_addr (void *data, const char *name)
     api = evas_gl_api_get (gl);
 
     for (i = 0; evas_gl_func_map[i].name; i++) {
-	if (! strcmp (evas_gl_func_map[i].name, name))
+	if (! strncmp (evas_gl_func_map[i].name, name, strlen(name)))
 	    return *((cairo_gl_generic_func_t *) (((char *) &api->version) + evas_gl_func_map[i].func));
     }
 
@@ -274,6 +276,11 @@ cairo_evas_gl_device_create (Evas_GL *evas_gl,
     cairo_evas_gl_context_t *ctx;
     cairo_status_t status;
 
+	if (! evas_gl ||! evas_context) {
+		fprintf (stderr, "cairo_evas_gl_device_create(): evas_gl or evas_context is NULL\n");
+	return _cairo_gl_context_create_in_error (CAIRO_STATUS_NULL_POINTER);
+	}
+
     ctx = calloc (1, sizeof (cairo_evas_gl_context_t));
     if (unlikely (ctx == NULL))
 	return _cairo_gl_context_create_in_error (CAIRO_STATUS_NO_MEMORY);
@@ -295,7 +302,7 @@ cairo_evas_gl_device_create (Evas_GL *evas_gl,
     ctx->dummy_surface = evas_gl_pbuffer_surface_create (ctx->evas_gl,
 							 evas_cfg,
 							 1, 1, NULL);
-    evas_gl_config_free (evas_cfg);
+    //evas_gl_config_free (evas_cfg);
 
     if (ctx->dummy_surface == NULL) {
         free (ctx);
@@ -343,8 +350,18 @@ cairo_gl_surface_create_for_evas_gl (cairo_device_t	*device,
 {
     cairo_evas_gl_surface_t *surface;
 
+	if ((! device)||(cairo_device_status(device)!= CAIRO_STATUS_SUCCESS)){
+		fprintf (stderr, "cairo_gl_surface_create_for_evas_gl(): cairo device is NULL or not available\n");
+	return _cairo_surface_create_in_error(CAIRO_STATUS_NULL_POINTER);
+	}
+
     if (unlikely (device->status))
 	return _cairo_surface_create_in_error (device->status);
+
+	if (! evas_surface || ! evas_config) {
+		fprintf (stderr, "cairo_gl_surface_create_for_evas_gl(): evas_surface or evas_config is NULL\n");
+	return _cairo_surface_create_in_error (CAIRO_STATUS_NULL_POINTER);
+	}
 
     if (device->backend->type != CAIRO_DEVICE_TYPE_GL)
 	return _cairo_surface_create_in_error (_cairo_error (CAIRO_STATUS_SURFACE_TYPE_MISMATCH));
@@ -356,7 +373,6 @@ cairo_gl_surface_create_for_evas_gl (cairo_device_t	*device,
     if (unlikely (surface == NULL))
 	return _cairo_surface_create_in_error (_cairo_error (CAIRO_STATUS_NO_MEMORY));
 
-
     _cairo_gl_surface_init (device, &surface->base,
 			    CAIRO_CONTENT_COLOR_ALPHA, width, height);
 
@@ -364,8 +380,10 @@ cairo_gl_surface_create_for_evas_gl (cairo_device_t	*device,
 	surface->base.supports_stencil = TRUE;
 
     /* does not matter num of samples */
-    if (evas_config->multisample_bits != EVAS_GL_MULTISAMPLE_NONE)
+    if (evas_config->multisample_bits != EVAS_GL_MULTISAMPLE_NONE) {
 	surface->base.num_samples = 2;
+	surface->base.supports_msaa = TRUE;
+    }
 
     surface->base.stencil_and_msaa_caps_initialized = TRUE;
 
@@ -388,6 +406,12 @@ static cairo_evas_gl_context_t *to_evas_gl_context (cairo_device_t *device)
 cairo_public Evas_GL *
 cairo_evas_gl_device_get_gl (cairo_device_t *device)
 {
+	if ((! device)||(cairo_device_status(device)!= CAIRO_STATUS_SUCCESS)){
+		fprintf(stderr,"\n cairo_evas_gl_device_get_gl(): cairo device is NULL or not available");
+	_cairo_error_throw(CAIRO_STATUS_DEVICE_ERROR);
+	return NULL;
+	}
+
     if (! is_evas_gl_device (device)) {
 	_cairo_error_throw (CAIRO_STATUS_DEVICE_TYPE_MISMATCH);
 	return NULL;
@@ -399,6 +423,12 @@ cairo_evas_gl_device_get_gl (cairo_device_t *device)
 cairo_public Evas_GL_Context *
 cairo_evas_gl_device_get_context (cairo_device_t *device)
 {
+	if ((! device)||(cairo_device_status(device)!= CAIRO_STATUS_SUCCESS)){
+		fprintf(stderr,"\n cairo_evas_gl_device_get_context(): cairo device is NULL or not available");		
+	_cairo_error_throw (CAIRO_STATUS_DEVICE_ERROR);
+	return NULL;
+	}
+
     if (! is_evas_gl_device (device)) {
 	_cairo_error_throw (CAIRO_STATUS_DEVICE_TYPE_MISMATCH);
 	return NULL;

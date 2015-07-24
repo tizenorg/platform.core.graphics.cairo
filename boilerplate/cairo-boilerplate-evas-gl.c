@@ -32,8 +32,8 @@
  */
 
 #include "cairo-boilerplate-private.h"
-
 #include <cairo-gl.h>
+#include <cairo-evas-gl.h>
 #include <Ecore_Evas.h>
 #include <Ecore.h>
 #include <Evas_GL.h>

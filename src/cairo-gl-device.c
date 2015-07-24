@@ -46,6 +46,10 @@
 #include "cairo-gl-private.h"
 #include "cairo-rtree-private.h"
 
+#if CAIRO_HAS_EVASGL_SURFACE
+#include "cairo-evas-gl.h"
+#endif
+
 #define MAX_MSAA_SAMPLES 4
 
 cairo_int_status_t

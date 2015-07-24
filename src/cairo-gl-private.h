@@ -63,22 +63,24 @@
 
 #include <assert.h>
 
-#if CAIRO_HAS_GL_SURFACE
-#if CAIRO_HAS_CGL_FUNCTIONS
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
+#if CAIRO_HAS_EVASGL_SURFACE
+  #include <Evas_GL.h>
 #else
-#include <GL/gl.h>
-#include <GL/glext.h>
-#endif
-#elif CAIRO_HAS_GLESV2_SURFACE
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#elif CAIRO_HAS_GLESV3_SURFACE
-#include <GLES3/gl3.h>
-#include <GLES3/gl3ext.h>
-#elif CAIRO_HAS_EVASGL_SURFACE
-#include <Evas_GL.h>
+  #if CAIRO_HAS_GL_SURFACE
+  #if CAIRO_HAS_CGL_FUNCTIONS
+  #include <OpenGL/gl.h>
+  #include <OpenGL/glext.h>
+  #else
+  #include <GL/gl.h>
+  #include <GL/glext.h>
+  #endif
+  #elif CAIRO_HAS_GLESV2_SURFACE
+  #include <GLES2/gl2.h>
+  #include <GLES2/gl2ext.h>
+  #elif CAIRO_HAS_GLESV3_SURFACE
+  #include <GLES3/gl3.h>
+  #include <GLES3/gl3ext.h>
+  #endif
 #endif
 
 #include "cairo-gl-ext-def-private.h"
