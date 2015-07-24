@@ -337,6 +337,9 @@ cairo_evas_gl_device_create (Evas_GL *evas_gl,
     else
 	ctx->has_multithread_makecurrent = FALSE;
 
+    // reset vbo_size
+    ctx->base.vbo_size = 16 * 1024;
+
     evas_gl_make_current (ctx->evas_gl, NULL, NULL);
     return &ctx->base.base;
 }
