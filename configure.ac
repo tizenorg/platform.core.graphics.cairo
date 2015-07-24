@@ -56,8 +56,8 @@ AC_CHECK_LIB(wayland-client, wl_display_connect,
       AC_DEFINE(HAVE_WAYLAND, 1, [Define to 1 if you have wayland available])
       wayland_LIBS="-lwayland-client -lwayland-egl"
      ],
-     [have_wayland="no (requires ttrace)"])],
-     [have_wayland="no (requires ttraec)"])
+     [have_wayland="no (requires wayland-egl)"])],
+     [have_wayland="no (requires wayland-egl)"])
 LIBS="$wayland_LIBS $LIBS"
 
 save_LIBS="$LIBS"

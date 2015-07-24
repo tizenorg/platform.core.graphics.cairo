@@ -91,8 +91,8 @@ _cairo_boilerplate_evas_gl_create_surface (const char		 *name,
     ecore_evas_init ();
 
 #ifdef HAVE_WAYLAND //Wayland (Tizen 3.0)
-    ee = ecore_evas_wayland_egl_new (NULL, 0, 0, 0, ceil (width), ceil (height),EINA_TRUE);
-#else 0
+    ee = ecore_evas_wayland_egl_new (NULL, 0, 0, 0, ceil (width), ceil (height), EINA_TRUE);
+#else
     ee = ecore_evas_gl_x11_new (NULL, 0, 0, 0, ceil (width), ceil (height));;
 #endif
 

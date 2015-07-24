@@ -7,7 +7,7 @@
 
 Name:           cairo
 #Version:        1.12.16
-Version:        1.12.14
+Version:        1.14.2
 Release:        0
 License:        LGPL-2.1+ or MPL-1.1
 Summary:        Vector Graphics Library with Cross-Device Output Support
