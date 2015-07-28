@@ -3,6 +3,7 @@
  * Copyright © 2009 Eric Anholt
  * Copyright © 2009 Chris Wilson
  * Copyright © 2005,2010 Red Hat, Inc
+ * Copyright © 2011,2015 Samsung Research America, Inc - Silicon Valley
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -36,6 +37,7 @@
  *	Carl Worth <cworth@cworth.org>
  *	Chris Wilson <chris@chris-wilson.co.uk>
  *	Eric Anholt <eric@anholt.net>
+ *	Henry Songt <hsong@sisa.samsung.com>
  */
 
 #ifndef CAIRO_GL_GRADIENT_PRIVATE_H
@@ -51,21 +53,26 @@
 
 #include "cairo-gl.h"
 
-#if 0
 #if CAIRO_HAS_EVASGL_SURFACE
-#include <Evas_GL.h>
+  #include <Evas_GL.h>
 #else
-	#if CAIRO_HAS_GL_SURFACE
-	#include <GL/gl.h>
-	#include <GL/glext.h>
-	#elif CAIRO_HAS_GLESV2_SURFACE
-	#include <GLES2/gl2.h>
-	#include <GLES2/gl2ext.h>
-	#elif CAIRO_HAS_GLESV3_SURFACE
-	#include <GLES3/gl3.h>
-	#include <GLES3/gl3ext.h>
-	#endif
-#endif
+  #if CAIRO_HAS_GL_SURFACE
+  #if CAIRO_HAS_CGL_FUNCTIONS
+  #include <OpenGL/gl.h>
+  #include <OpenGL/glext.h>
+  #else
+  #include <GL/gl.h>
+  #include <GL/glext.h>
+  #endif
+  #elif CAIRO_HAS_GLESV2_SURFACE
+  #include <GLES2/gl2.h>
+  #include <GLES2/gl2ext.h>
+  #elif CAIRO_HAS_GLESV3_SURFACE
+  #include <GLES3/gl3.h>
+  #include <GLES3/gl3ext.h>
+  #elif CAIRO_HAS_EVASGL_SURFACE
+  #include <Evas_GL.h>
+  #endif
 #endif
 
 #define CAIRO_GL_GRADIENT_CACHE_SIZE 4096
@@ -77,7 +84,7 @@ typedef struct _cairo_gl_gradient {
     cairo_cache_entry_t           cache_entry;
     cairo_reference_count_t       ref_count;
     cairo_device_t               *device; /* NB: we don't hold a reference */
-    unsigned int            tex;
+    GLuint                        tex;
     unsigned int	          n_stops;
     const cairo_gradient_stop_t  *stops;
     cairo_gradient_stop_t         stops_embedded[1];

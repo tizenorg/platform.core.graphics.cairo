@@ -11,8 +11,11 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR(src/cairo.h)
 AC_CONFIG_HEADERS(config.h)
 
+AC_CHECK_HEADERS([unistd.h sys/ioctl.h])
+
 AM_INIT_AUTOMAKE([1.11 foreign -Wall no-define no-dist-gzip dist-xz])
 AM_SILENT_RULES([yes])
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR]) dnl Workaround for Automake 1.12
 
 # Initialize libtool
 LT_PREREQ([2.2])
@@ -34,9 +37,7 @@ m4_include(build/configure.ac.warnings)	dnl checks for compiler warning
 m4_include(build/configure.ac.system)	dnl checks for system functions, headers, libs
 m4_include(build/configure.ac.analysis)	dnl checks for analysis tools (lcov, etc)
 m4_include(build/configure.ac.noversion) dnl disable builtin libtool versioning
-m4_include(build/configure.ac.openmp) dnl checks for openmp
 m4_include(build/configure.ac.pthread)  dnl checks for pthreads
-m4_include(build/configure.ac.tls)  dnl checks for thread-local storage
 AC_CACHE_SAVE
 
 dnl ===========================================================================
@@ -48,6 +49,16 @@ AC_CHECK_LIB(z, compress,
 	 ],
 	 [have_libz="no (requires zlib http://www.gzip.org/zlib/)"])],
 	 [have_libz="no (requires zlib http://www.gzip.org/zlib/)"])
+
+AC_CHECK_LIB(wayland-client, wl_display_connect,
+     [AC_CHECK_HEADER(wayland-client.h, [
+      have_wayland=yes
+      AC_DEFINE(HAVE_WAYLAND, 1, [Define to 1 if you have wayland available])
+      wayland_LIBS="-lwayland-client -lwayland-egl"
+     ],
+     [have_wayland="no (requires wayland-egl)"])],
+     [have_wayland="no (requires wayland-egl)"])
+LIBS="$wayland_LIBS $LIBS"
 
 save_LIBS="$LIBS"
 AC_CHECK_LIB(lzo2, lzo2a_decompress,
@@ -73,22 +84,6 @@ if test "x$have_dlsym" = "xyes"; then
   AC_DEFINE([CAIRO_HAS_DLSYM], 1, [Define to 1 if dlsym is available])
 fi
 AM_CONDITIONAL(CAIRO_HAS_DLSYM, test "x$have_dlsym" = "xyes")
-
-dnl ===========================================================================
-dnl Check support for TLS
-have_tls=no
-CAIRO_ENABLE(tls, tls, no, [CAIRO_CONFIGURE_TLS])
-AM_CONDITIONAL(HAVE_TLS, test "x$use_tls" = "xyes")
-AC_SUBST(tls_CFLAGS)
-AC_SUBST(tls_LIBS)
-
-dnl ===========================================================================
-dnl Check support for pthread_setspecific
-have_pthread_setspecific=no
-CAIRO_ENABLE(pthread_setspecific, pthread_setspecific, no, [CAIRO_CONFIGURE_PTHREAD_SETSPECIFIC])
-AM_CONDITIONAL(HAVE_PTHREAD_SETSPECIFIC, test "x$use_pthread_setspecific" = "xyes")
-AC_SUBST(pthread_setspecific_CFLAGS)
-AC_SUBST(pthread_setspecific_LIBS)
 
 dnl ===========================================================================
 
@@ -163,7 +158,7 @@ CAIRO_ENABLE_SURFACE_BACKEND(xlib_xrender, Xlib Xrender, auto, [
     old_LIBS=$LIBS
     CFLAGS="$CFLAGS $xlib_CFLAGS $xlib_NONPKGCONFIG_CFLAGS $xlib_xrender_CFLAGS $xlib_xrender_NONPKGCONFIG_CFLAGS"
     LIBS="$LIBS $xlib_LIBS $xlib_NONPKGCONFIG_LIBS $xlib_xrender_LIBS $xlib_xrender_NONPKGCONFIG_LIBS"
-    AC_CHECK_FUNCS([XRenderCreateLinearGradient XRenderCreateRadialGradient XRenderCreateConicalGradient])
+    AC_CHECK_FUNCS([XRenderCreateSolidFill XRenderCreateLinearGradient XRenderCreateRadialGradient XRenderCreateConicalGradient])
     CFLAGS=$old_CFLAGS
     LIBS=$old_LIBS
 
@@ -206,6 +201,7 @@ CAIRO_ENABLE_SURFACE_BACKEND(qt, Qt, no, [
 		    [qt_REQUIRES=""
 		     use_qt="no (requires Qt4 development libraries)"
 		     ])
+  qt_NONPKGCONFIG_LIBS="-lstdc++"
 ])
 
 dnl ===========================================================================
@@ -265,16 +261,16 @@ CAIRO_ENABLE_SURFACE_BACKEND(skia, Skia, no, [
 			      [directory to find compiled skia sources])],
 	      [skia_DIR="$withval"],
 	      [skia_DIR="`pwd`/../skia"])
-  AC_ARG_WITH([skia-bulid],
-	      [AS_HELP_STRING([--with-skia-build=(Release|Debug)]
+  AC_ARG_WITH([skia-build-type],
+	      [AS_HELP_STRING([--with-skia-build-type=(Release|Debug)]
 			      [build of skia to link with, default is Release])],
-	      [skia_BUILD="$withval"],
-	      [skia_BUILD="Release"])
+	      [skia_BUILD_TYPE="$withval"],
+	      [skia_BUILD_TYPE="Release"])
   skia_NONPKGCONFIG_CFLAGS="-I$skia_DIR/include/config -I$skia_DIR/include/core -I$skia_DIR/include/effects"
-  if test "x$skia_BUILD" = x"Release"; then
+  if test "x$skia_BUILD_TYPE" = "xRelease"; then
   	skia_NONPKGCONFIG_CFLAGS="-DSK_RELEASE -DSK_CAN_USE_FLOAT $skia_NONPKGCONFIG_CFLAGS"
   fi
-  skia_NONPKGCONFIG_LIBS="--start-group $skia_DIR/out/$skia_BUILD/obj.target/gyp/libeffects.a $skia_DIR/out/$skia_BUILD/obj.target/gyp/libimages.a $skia_DIR/out/$skia_BUILD/obj.target/gyp/libutils.a $skia_DIR/out/$skia_BUILD/obj.target/gyp/libopts.a $skia_DIR/out/$skia_BUILD/obj.target/gyp/libcore.a -end-group"
+  skia_NONPKGCONFIG_LIBS="-L$skia_DIR/out/$skia_BUILD_TYPE/lib.target/ -lskia -lstdc++"
   AC_SUBST(skia_DIR)
 ])
 
@@ -362,20 +358,21 @@ CAIRO_ENABLE_SURFACE_BACKEND(gl, OpenGL, no, [
   gl_REQUIRES="gl"
   PKG_CHECK_MODULES(gl, $gl_REQUIRES,, [
 	  dnl Fallback to searching for headers
-	  AC_CHECK_HEADER(GL/gl.h,, [use_gl="no (gl.pc nor OpenGL headers not found)"])
+	  AC_CHECK_HEADER([GL/gl.h, OpenGL/gl.h], [use_gl="no (gl.pc nor OpenGL headers not found)"])
 	  if test "x$use_gl" = "xyes"; then
 	      gl_NONPKGCONFIG_CFLAGS=
-	      gl_NONPKGCONFIG_LIBS="-lGL"
+	      gl_NONPKGCONFIG_LIBS=
 	  fi])
 
   if test "x$have_dl" = "xyes" -a "x$have_dlsym" = "xyes"; then
-    gl_LIBS="$gl_LIBS -ldl"
+    gl_LIBS="-ldl"
   fi
 
   need_glx_functions=yes
   need_wgl_functions=yes
   need_egl_functions=yes
   need_evasgl_functions=yes
+  need_cgl_functions=yes
 ])
 
 dnl ===========================================================================
@@ -408,6 +405,10 @@ CAIRO_ENABLE_SURFACE_BACKEND(glesv2, OpenGLESv2, no, [
 
   if test "x$have_dl" = "xyes" -a "x$have_dlsym" = "xyes"; then
     glesv2_LIBS="$glesv2_LIBS -ldl"
+  fi
+
+  if test "x$use_glesv2" = "xyes" -a "x$use_gl" = "xyes"; then
+      AC_MSG_ERROR([use either --enable-gl=yes or --enable-glesv2=yes. Not both at the same time.])
   fi
 
   need_egl_functions=yes
@@ -444,15 +445,6 @@ CAIRO_ENABLE_SURFACE_BACKEND(directfb, directfb, no, [
   PKG_CHECK_MODULES(directfb, $directfb_REQUIRES, ,
 		    [use_directfb="no (requires $directfb_REQUIRES http://www.directfb.org)"])
 ])
-
-dnl ===========================================================================
-
-CAIRO_ENABLE_SURFACE_BACKEND(tg, TG, no, [
-  if test "x$use_tls" != "xyes" -a \
-          "x$use_pthread_setspecific" != "xyes"; then
-    use_tg="no (requires tls or pthread_setspecific)"
-    tg_REQUIRES="tls or pthread setspecific"
-  fi])
 
 dnl ===========================================================================
 
@@ -507,8 +499,24 @@ CAIRO_ENABLE_FUNCTIONS(glx, GLX, auto, [
     glx_NONPKGCONFIG_CFLAGS=
     glx_NONPKGCONFIG_LIBS="-lGL"
     CFLAGS="$save_CFLAGS"
+    need_cgl_functions="no"
   else
       use_glx="no (not required by any backend)"
+  fi
+])
+
+CAIRO_ENABLE_FUNCTIONS(cgl, CGL, auto, [
+  if test "x$need_cgl_functions" = "xyes"; then
+    save_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $gl_CFLAGS $gl_NONPKGCONFIG_CFLAGS"
+    AC_CHECK_HEADER(OpenGL/gl.h,, [use_gl="no (CGL headers not found)"])
+    cgl_LIBS="-Xlinker -framework -Xlinker OpenGL"
+    cgl_NONPKGCONFIG_CFLAGS=
+    cgl_NONPKGCONFIG_LIBS=
+    CFLAGS="$save_CFLAGS"
+    need_glx_functions="no"
+  else
+      use_cgl="no (not required by any backend)"
   fi
 ])
 
@@ -688,7 +696,7 @@ CAIRO_ENABLE_SURFACE_BACKEND(svg, SVG, yes, [
   fi
 ])
 
-LIBRSVG_VERSION_REQUIRED=2.15.0
+LIBRSVG_VERSION_REQUIRED=2.35.0
 test_svg=no
 any2ppm_svg=no
 if test "x$use_svg" = "xyes"; then
@@ -717,7 +725,7 @@ CAIRO_ENABLE(test_surfaces, test surfaces, no)
 dnl ===========================================================================
 
 CAIRO_ENABLE_SURFACE_BACKEND(image, image, always, [
-  pixman_REQUIRES="pixman-1 >= 0.22.0"
+  pixman_REQUIRES="pixman-1 >= 0.30.0"
   PKG_CHECK_MODULES(pixman, $pixman_REQUIRES, ,
     [use_image="no (requires $pixman_REQUIRES http://cairographics.org/releases/)"])
   image_REQUIRES=$pixman_REQUIRES
@@ -746,14 +754,6 @@ dnl ===========================================================================
 CAIRO_ENABLE_FONT_BACKEND(user, user, always)
 
 dnl ===========================================================================
-dnl Check support for openmp
-have_openmp=no
-CAIRO_ENABLE(openmp, openmp, no, [CAIRO_CONFIGURE_OPENMP])
-AM_CONDITIONAL(HAVE_OPENMP, test "x$use_openmp" = "xyes")
-AC_SUBST(openmp_CFLAGS)
-AC_SUBST(openmp_LIBS)
-
-dnl ===========================================================================
 dnl
 dnl This needs to be last on our list of features so that the pthread libs and flags
 dnl gets prefixed in front of everything else in CAIRO_{CFLAGS,LIBS}.
@@ -773,7 +773,7 @@ dnl ===========================================================================
 dnl Build gobject integration library
 
 CAIRO_ENABLE_FUNCTIONS(gobject, gobject, auto, [
-  gobject_REQUIRES="gobject-2.0 glib-2.0"
+  gobject_REQUIRES="gobject-2.0 glib-2.0 >= 2.14"
   PKG_CHECK_MODULES(GOBJECT, $gobject_REQUIRES, ,
     [use_gobject="no (requires $gobject_REQUIRES http://download.gnome.org/pub/GNOME/sources/glib/)"])
   gobject_NONPKGCONFIG_EXTRA_LIBS="-L\${libdir} -lcairo-gobject"
@@ -868,7 +868,7 @@ CAIRO_ENABLE(symbol_lookup, symbol-lookup, auto, [
 PKG_CHECK_MODULES(glib, glib-2.0, have_glib=yes, have_glib=no)
 AC_SUBST(glib_CFLAGS)
 AC_SUBST(glib_LIBS)
-AM_CONDITIONAL(BUILD_SPHINX, test "x$have_glib" = "xyes")
+AM_CONDITIONAL(BUILD_SPHINX, test "x$have_glib" = "xyes" -a "x$have_windows" = "xno")
 
 save_LIBS="$LIBS"
 AC_CHECK_LIB(rt, shm_open, shm_LIBS="-lrt")
@@ -918,12 +918,24 @@ AC_CONFIG_FILES([
 Makefile
 boilerplate/Makefile
 src/Makefile
+test/Makefile
+test/pdiff/Makefile
+perf/Makefile
+perf/micro/Makefile
 util/Makefile
+util/cairo-fdr/Makefile
 util/cairo-gobject/Makefile
 util/cairo-missing/Makefile
 util/cairo-script/Makefile
 util/cairo-script/examples/Makefile
+util/cairo-sphinx/Makefile
+util/cairo-trace/Makefile
+util/cairo-trace/cairo-trace
+doc/Makefile
+doc/public/Makefile
 ])
+AC_CONFIG_COMMANDS([cairo-trace],
+		   [chmod a+x util/cairo-trace/cairo-trace])
 
 AC_OUTPUT
 CAIRO_REPORT

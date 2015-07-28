@@ -86,6 +86,7 @@ _cairo_path_fixed_init (cairo_path_fixed_t *path)
     path->current_point.x = 0;
     path->current_point.y = 0;
     path->last_move_point = path->current_point;
+    path->start_point = path->current_point;
 
     path->has_current_point = FALSE;
     path->needs_move_to = TRUE;
@@ -95,6 +96,7 @@ _cairo_path_fixed_init (cairo_path_fixed_t *path)
     path->fill_is_rectilinear = TRUE;
     path->fill_maybe_region = TRUE;
     path->fill_is_empty = TRUE;
+    path->is_convex = TRUE;
 
     path->extents.p1.x = path->extents.p1.y = 0;
     path->extents.p2.x = path->extents.p2.y = 0;
@@ -132,6 +134,9 @@ _cairo_path_fixed_init_copy (cairo_path_fixed_t *path,
 
     path->buf.base.num_ops = other->buf.base.num_ops;
     path->buf.base.num_points = other->buf.base.num_points;
+
+    path->is_convex = other->is_convex;
+
     memcpy (path->buf.op, other->buf.base.op,
 	    other->buf.base.num_ops * sizeof (other->buf.op[0]));
     memcpy (path->buf.points, other->buf.points,
@@ -408,6 +413,11 @@ _cairo_path_fixed_move_to (cairo_path_fixed_t  *path,
     path->current_point.y = y;
     path->last_move_point = path->current_point;
 
+    if (_cairo_path_fixed_is_empty (path))
+	path->is_convex = TRUE;
+    else
+	path->is_convex = FALSE;
+
     return CAIRO_STATUS_SUCCESS;
 }
 
@@ -449,6 +459,11 @@ _cairo_path_fixed_new_sub_path (cairo_path_fixed_t *path)
 	}
 	path->needs_move_to = TRUE;
     }
+
+    if (_cairo_path_fixed_is_empty (path))
+	path->is_convex = TRUE;
+    else
+	path->is_convex = FALSE;
 
     path->has_current_point = FALSE;
 }
@@ -548,6 +563,13 @@ _cairo_path_fixed_line_to (cairo_path_fixed_t *path,
 
     _cairo_box_add_point (&path->extents, &point);
 
+    /* if line to point does not match start point, is_convex false */
+    if (path->is_convex) {
+	if (path->start_point.x != x &&
+	    path->start_point.y != y)
+	    path->is_convex = FALSE;
+    }
+
     return _cairo_path_fixed_add (path, CAIRO_PATH_OP_LINE_TO, &point, 1);
 }
 
@@ -619,6 +641,8 @@ _cairo_path_fixed_curve_to (cairo_path_fixed_t	*path,
     path->fill_is_rectilinear = FALSE;
     path->fill_maybe_region = FALSE;
     path->fill_is_empty = FALSE;
+
+    path->is_convex = FALSE;
 
     return _cairo_path_fixed_add (path, CAIRO_PATH_OP_CURVE_TO, point, 3);
 }
@@ -847,6 +871,9 @@ _cairo_path_fixed_interpret (const cairo_path_fixed_t		*path,
 	}
     } cairo_path_foreach_buf_end (buf, path);
 
+    if (path->needs_move_to && path->has_current_point)
+	return (*move_to) (closure, &path->current_point);
+
     return CAIRO_STATUS_SUCCESS;
 }
 
@@ -965,8 +992,19 @@ _cairo_path_fixed_offset_and_scale (cairo_path_fixed_t *path,
 
     path->extents.p1.x = _cairo_fixed_mul (scalex, path->extents.p1.x) + offx;
     path->extents.p2.x = _cairo_fixed_mul (scalex, path->extents.p2.x) + offx;
+    if (scalex < 0) {
+	cairo_fixed_t t = path->extents.p1.x;
+	path->extents.p1.x = path->extents.p2.x;
+	path->extents.p2.x = t;
+    }
+
     path->extents.p1.y = _cairo_fixed_mul (scaley, path->extents.p1.y) + offy;
     path->extents.p2.y = _cairo_fixed_mul (scaley, path->extents.p2.y) + offy;
+    if (scaley < 0) {
+	cairo_fixed_t t = path->extents.p1.y;
+	path->extents.p1.y = path->extents.p2.y;
+	path->extents.p2.y = t;
+    }
 }
 
 void
@@ -1289,7 +1327,7 @@ _cairo_path_fixed_is_box (const cairo_path_fixed_t *path,
 }
 
 /* Determine whether two lines A->B and C->D intersect based on the 
- * algorithm described here: http://paulbourke.net/geometry/lineline2d/ */
+ * algorithm described here: http://paulbourke.net/geometry/pointlineplane/ */
 static inline cairo_bool_t
 _lines_intersect_or_are_coincident (cairo_point_t a,
 				    cairo_point_t b,
@@ -1297,6 +1335,7 @@ _lines_intersect_or_are_coincident (cairo_point_t a,
 				    cairo_point_t d)
 {
     cairo_int64_t numerator_a, numerator_b, denominator;
+    cairo_bool_t denominator_negative;
 
     denominator = _cairo_int64_sub (_cairo_int32x32_64_mul (d.y - c.y, b.x - a.x),
 				    _cairo_int32x32_64_mul (d.x - c.x, b.y - a.y));
@@ -1316,20 +1355,34 @@ _lines_intersect_or_are_coincident (cairo_point_t a,
 	return FALSE;
     }
 
-    /* If either division would produce a number between 0 and 1, i.e.
-     * the numerator is smaller than the denominator and their signs are
-     * the same, then the lines intersect. */
-    if (_cairo_int64_lt (numerator_a, denominator) &&
-	! (_cairo_int64_negative (numerator_a) ^ _cairo_int64_negative(denominator))) {
-	return TRUE;
+    /* The lines intersect if both quotients are between 0 and 1 (exclusive). */
+
+     /* We first test whether either quotient is a negative number. */
+    denominator_negative = _cairo_int64_negative (denominator);
+    if (_cairo_int64_negative (numerator_a) ^ denominator_negative)
+	return FALSE;
+    if (_cairo_int64_negative (numerator_b) ^ denominator_negative)
+	return FALSE;
+
+    /* A zero quotient indicates an "intersection" at an endpoint, which
+     * we aren't considering a true intersection. */
+    if (_cairo_int64_is_zero (numerator_a) || _cairo_int64_is_zero (numerator_b))
+	return FALSE;
+
+    /* If the absolute value of the numerator is larger than or equal to the
+     * denominator the result of the division would be greater than or equal
+     * to one. */
+    if (! denominator_negative) {
+        if (! _cairo_int64_lt (numerator_a, denominator) ||
+	    ! _cairo_int64_lt (numerator_b, denominator))
+	    return FALSE;
+    } else {
+        if (! _cairo_int64_lt (denominator, numerator_a) ||
+	    ! _cairo_int64_lt (denominator, numerator_b))
+	    return FALSE;
     }
 
-    if (_cairo_int64_lt (numerator_b, denominator) &&
-	! (_cairo_int64_negative (numerator_b) ^ _cairo_int64_negative(denominator))) {
-	return TRUE;
-    }
-
-    return FALSE;
+    return TRUE;
 }
 
 cairo_bool_t
@@ -1451,6 +1504,19 @@ _cairo_path_fixed_is_single_line (const cairo_path_fixed_t *path)
 
     return buf->op[0] == CAIRO_PATH_OP_MOVE_TO &&
 	buf->op[1] == CAIRO_PATH_OP_LINE_TO;
+}
+
+cairo_bool_t
+_cairo_path_fixed_is_empty (const cairo_path_fixed_t *path)
+{
+    unsigned int i;
+    const cairo_path_buf_t *buf = cairo_path_head (path);
+    for (i = 0; i < buf->num_ops; i++) {
+	if (buf->op[i] != CAIRO_PATH_OP_MOVE_TO)
+	    return FALSE;
+    }
+
+    return TRUE;
 }
 
 cairo_bool_t

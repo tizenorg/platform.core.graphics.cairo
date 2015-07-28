@@ -113,7 +113,7 @@ struct _cairo_observer {
 };
 
 /**
- * cairo_hash_entry_t:
+ * _cairo_hash_entry:
  *
  * A #cairo_hash_entry_t contains both a key and a value for
  * #cairo_hash_table_t. User-derived types for #cairo_hash_entry_t must
@@ -158,7 +158,7 @@ struct _cairo_array {
 };
 
 /**
- * cairo_lcd_filter_t:
+ * _cairo_lcd_filter:
  * @CAIRO_LCD_FILTER_DEFAULT: Use the default LCD filter for
  *   font backend and target device
  * @CAIRO_LCD_FILTER_NONE: Do not perform LCD filtering
@@ -194,7 +194,7 @@ struct _cairo_font_options {
     cairo_hint_style_t hint_style;
     cairo_hint_metrics_t hint_metrics;
     cairo_round_glyph_positions_t round_glyph_positions;
-	cairo_font_color_t color;
+    cairo_font_color_t color;
 };
 
 struct _cairo_glyph_text_info {
@@ -447,7 +447,7 @@ typedef struct _cairo_shadow_cache {
     double           scale;
     cairo_list_t     link;
 } cairo_shadow_cache_t;
-
+    
 CAIRO_END_DECLS
 
 #endif /* CAIRO_TYPES_PRIVATE_H */

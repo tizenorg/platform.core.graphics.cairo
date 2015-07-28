@@ -339,4 +339,3 @@ _cairo_path_fixed_fill_rectilinear_to_boxes (const cairo_path_fixed_t *path,
 								   antialias,
 								   boxes);
 }
-

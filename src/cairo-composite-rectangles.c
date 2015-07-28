@@ -61,7 +61,7 @@ _cairo_composite_rectangles_check_lazy_init (cairo_composite_rectangles_t *exten
 
     if (type == CAIRO_PATTERN_TYPE_SURFACE) {
     cairo_surface_pattern_t *surface_pattern = (cairo_surface_pattern_t *) pattern;
-    cairo_surface_t *pattern_surface = surface_pattern->surface;
+    cairo_surface_t *pattern_surface = pattern_surface = surface_pattern->surface;
 
 	/* XXX: both source and target are GL surface */
 	if (cairo_surface_get_type (pattern_surface) == CAIRO_SURFACE_TYPE_GL &&
@@ -87,7 +87,7 @@ _cairo_composite_reduce_pattern (const cairo_pattern_t *src,
     if (dst->base.type == CAIRO_PATTERN_TYPE_SOLID)
 	return;
 
-    dst->base.filter = _cairo_pattern_analyze_filter (&dst->base, NULL),
+    dst->base.filter = _cairo_pattern_analyze_filter (&dst->base);
 
     tx = ty = 0;
     if (_cairo_matrix_is_pixman_translation (&dst->base.matrix,
@@ -243,6 +243,13 @@ _cairo_composite_rectangles_intersect (cairo_composite_rectangles_t *extents,
     if (! _cairo_rectangle_intersect (&extents->unbounded,
 				      _cairo_clip_get_extents (extents->clip)))
 	return CAIRO_INT_STATUS_NOTHING_TO_DO;
+
+    if (! _cairo_rectangle_intersect (&extents->bounded,
+				      _cairo_clip_get_extents (extents->clip)) &&
+	extents->is_bounded & CAIRO_OPERATOR_BOUND_BY_MASK)
+    {
+	return CAIRO_INT_STATUS_NOTHING_TO_DO;
+    }
 
     if (extents->source_pattern.base.type != CAIRO_PATTERN_TYPE_SOLID)
 	_cairo_pattern_sampled_area (&extents->source_pattern.base,

@@ -56,10 +56,6 @@
 #include "cairo-surface-subsurface-private.h"
 #include "cairo-image-filters-private.h"
 
-#if CAIRO_HAS_TG_SURFACE
-#include "cairo-tg-private.h"
-#endif
-
 #define PIXMAN_MAX_INT ((pixman_fixed_1 >> 1) - pixman_fixed_e) /* need to ensure deltas also fit */
 
 #if CAIRO_NO_MUTEX
@@ -444,51 +440,6 @@ _defer_free_cleanup (pixman_image_t *pixman_image,
     cairo_surface_destroy (closure);
 }
 
-typedef struct _cairo_image_buffer
-{
-    cairo_format_t	    format;
-    unsigned char	    *data;
-    int			    width;
-    int			    height;
-    int			    stride;
-    pixman_image_t	    *pixman_image;
-    pixman_format_code_t    pixman_format;
-} cairo_image_buffer_t;
-
-static inline void
-_get_image_buffer (cairo_surface_t *surface, cairo_image_buffer_t *image_buffer)
-{
-    if (surface->backend->type == CAIRO_SURFACE_TYPE_IMAGE)
-    {
-	cairo_image_surface_t *image = (cairo_image_surface_t *)surface;
-
-	image_buffer->format = image->format;
-	image_buffer->data = image->data;
-	image_buffer->width = image->width;
-	image_buffer->height = image->height;
-	image_buffer->stride = image->stride;
-	image_buffer->pixman_image = image->pixman_image;
-	image_buffer->pixman_format = image->pixman_format;
-    }
-#if CAIRO_HAS_TG_SURFACE
-    else if (surface->backend->type == CAIRO_SURFACE_TYPE_TG)
-    {
-	cairo_tg_surface_t *tg = (cairo_tg_surface_t *)surface;
-
-	image_buffer->format = tg->format;
-	image_buffer->data = tg->data;
-	image_buffer->width = tg->width;
-	image_buffer->height = tg->height;
-	image_buffer->stride = tg->stride;
-	image_buffer->pixman_image = ((cairo_image_surface_t *)(tg->image_surface))->pixman_image;
-	image_buffer->pixman_format = ((cairo_image_surface_t *)(tg->image_surface))->pixman_format;
-
-	/* flush the journal to make the memory image_buffer up-to-date. */
-	cairo_surface_flush (surface);
-    }
-#endif
-}
-
 static uint16_t
 expand_channel (uint16_t v, uint32_t bits)
 {
@@ -502,25 +453,25 @@ expand_channel (uint16_t v, uint32_t bits)
 }
 
 static pixman_image_t *
-_pixel_to_solid (const cairo_image_buffer_t *image_buffer, int x, int y)
+_pixel_to_solid (cairo_image_surface_t *image, int x, int y)
 {
     uint32_t pixel;
     pixman_color_t color;
 
     TRACE ((stderr, "%s\n", __FUNCTION__));
 
-    switch (image_buffer->format) {
+    switch (image->format) {
     default:
     case CAIRO_FORMAT_INVALID:
 	ASSERT_NOT_REACHED;
 	return NULL;
 
     case CAIRO_FORMAT_A1:
-	pixel = *(uint8_t *) (image_buffer->data + y * image_buffer->stride + x/8);
+	pixel = *(uint8_t *) (image->data + y * image->stride + x/8);
 	return pixel & (1 << (x&7)) ? _pixman_black_image () : _pixman_transparent_image ();
 
     case CAIRO_FORMAT_A8:
-	color.alpha = *(uint8_t *) (image_buffer->data + y * image_buffer->stride + x);
+	color.alpha = *(uint8_t *) (image->data + y * image->stride + x);
 	color.alpha |= color.alpha << 8;
 	if (color.alpha == 0)
 	    return _pixman_transparent_image ();
@@ -531,7 +482,7 @@ _pixel_to_solid (const cairo_image_buffer_t *image_buffer, int x, int y)
 	return pixman_image_create_solid_fill (&color);
 
     case CAIRO_FORMAT_RGB16_565:
-	pixel = *(uint16_t *) (image_buffer->data + y * image_buffer->stride + 2 * x);
+	pixel = *(uint16_t *) (image->data + y * image->stride + 2 * x);
 	if (pixel == 0)
 	    return _pixman_black_image ();
 	if (pixel == 0xffff)
@@ -544,7 +495,7 @@ _pixel_to_solid (const cairo_image_buffer_t *image_buffer, int x, int y)
 	return pixman_image_create_solid_fill (&color);
 
     case CAIRO_FORMAT_RGB30:
-	pixel = *(uint32_t *) (image_buffer->data + y * image_buffer->stride + 4 * x);
+	pixel = *(uint32_t *) (image->data + y * image->stride + 4 * x);
 	pixel &= 0x3fffffff; /* ignore alpha bits */
 	if (pixel == 0)
 	    return _pixman_black_image ();
@@ -560,8 +511,8 @@ _pixel_to_solid (const cairo_image_buffer_t *image_buffer, int x, int y)
 
     case CAIRO_FORMAT_ARGB32:
     case CAIRO_FORMAT_RGB24:
-	pixel = *(uint32_t *) (image_buffer->data + y * image_buffer->stride + 4 * x);
-	color.alpha = image_buffer->format == CAIRO_FORMAT_ARGB32 ? (pixel >> 24) | (pixel >> 16 & 0xff00) : 0xffff;
+	pixel = *(uint32_t *) (image->data + y * image->stride + 4 * x);
+	color.alpha = image->format == CAIRO_FORMAT_ARGB32 ? (pixel >> 24) | (pixel >> 16 & 0xff00) : 0xffff;
 	if (color.alpha == 0)
 	    return _pixman_transparent_image ();
 	if (pixel == 0xffffffff)
@@ -575,6 +526,368 @@ _pixel_to_solid (const cairo_image_buffer_t *image_buffer, int x, int y)
 	return pixman_image_create_solid_fill (&color);
     }
 }
+
+/* ========================================================================== */
+
+/* Index into filter table */
+typedef enum
+{
+    KERNEL_IMPULSE,
+    KERNEL_BOX,
+    KERNEL_LINEAR,
+    KERNEL_MITCHELL,
+    KERNEL_NOTCH,
+    KERNEL_CATMULL_ROM,
+    KERNEL_LANCZOS3,
+    KERNEL_LANCZOS3_STRETCHED,
+    KERNEL_TENT
+} kernel_t;
+
+/* Produce contribution of a filter of size r for pixel centered on x.
+   For a typical low-pass function this evaluates the function at x/r.
+   If the frequency is higher than 1/2, such as when r is less than 1,
+   this may need to integrate several samples, see cubic for examples.
+*/
+typedef double (* kernel_func_t) (double x, double r);
+
+/* Return maximum number of pixels that will be non-zero. Except for
+   impluse this is the maximum of 2 and the width of the non-zero part
+   of the filter rounded up to the next integer.
+*/
+typedef int (* kernel_width_func_t) (double r);
+
+/* Table of filters */
+typedef struct
+{
+    kernel_t		kernel;
+    kernel_func_t	func;
+    kernel_width_func_t	width;
+} filter_info_t;
+
+/* PIXMAN_KERNEL_IMPULSE: Returns pixel nearest the center.  This
+   matches PIXMAN_FILTER_NEAREST. This is useful if you wish to
+   combine the result of nearest in one direction with another filter
+   in the other.
+*/
+
+static double
+impulse_kernel (double x, double r)
+{
+    return 1;
+}
+
+static int
+impulse_width (double r)
+{
+    return 1;
+}
+
+/* PIXMAN_KERNEL_BOX: Intersection of a box of width r with square
+   pixels. This is the smallest possible filter such that the output
+   image contains an equal contribution from all the input
+   pixels. Lots of software uses this. The function is a trapazoid of
+   width r+1, not a box.
+
+   When r == 1.0, PIXMAN_KERNEL_BOX, PIXMAN_KERNEL_LINEAR, and
+   PIXMAN_KERNEL_TENT all produce the same filter, allowing
+   them to be exchanged at this point.
+*/
+
+static double
+box_kernel (double x, double r)
+{
+    return MAX (0.0, MIN (MIN (r, 1.0),
+			  MIN ((r + 1) / 2 - x, (r + 1) / 2 + x)));
+}
+
+static int
+box_width (double r)
+{
+    return r < 1.0 ? 2 : ceil(r + 1);
+}
+
+/* PIXMAN_KERNEL_LINEAR: Weighted sum of the two pixels nearest the
+   center, or a triangle of width 2. This matches
+   PIXMAN_FILTER_BILINEAR. This is useful if you wish to combine the
+   result of bilinear in one direction with another filter in the
+   other.  This is not a good filter if r > 1. You may actually want
+   PIXMAN_FILTER_TENT.
+
+   When r == 1.0, PIXMAN_KERNEL_BOX, PIXMAN_KERNEL_LINEAR, and
+   PIXMAN_KERNEL_TENT all produce the same filter, allowing
+   them to be exchanged at this point.
+*/
+
+static double
+linear_kernel (double x, double r)
+{
+    return MAX (1.0 - fabs(x), 0.0);
+}
+
+static int
+linear_width (double r)
+{
+    return 2;
+}
+
+/* Cubic functions described in the Mitchell-Netravali paper.
+   http://mentallandscape.com/Papers_siggraph88.pdf. This describes
+   all possible cubic functions that can be used for sampling.
+*/
+
+static double
+general_cubic (double x, double r, double B, double C)
+{
+    double ax;
+    if (r < 1.0)
+	return
+	    general_cubic(x * 2 - .5, r * 2, B, C) +
+	    general_cubic(x * 2 + .5, r * 2, B, C);
+
+    ax = fabs (x / r);
+
+    if (ax < 1)
+    {
+	return (((12 - 9 * B - 6 * C) * ax +
+		 (-18 + 12 * B + 6 * C)) * ax * ax +
+		(6 - 2 * B)) / 6;
+    }
+    else if (ax < 2)
+    {
+	return ((((-B - 6 * C) * ax +
+		 (6 * B + 30 * C)) * ax +
+		(-12 * B - 48 * C)) * ax +
+		(8 * B + 24 * C)) / 6;
+    }
+    else
+    {
+	return 0.0;
+    }
+}
+
+static int
+cubic_width (double r)
+{
+    return MAX (2, ceil (r * 4));
+}
+
+/* PIXMAN_KERNEL_CATMULL_ROM: Catmull-Rom interpolation. Often called
+   "cubic interpolation", "b-spline", or just "cubic" by other
+   software. This filter has negative values so it can produce ringing
+   and output pixels outside the range of input pixels. This is very
+   close to lanczos2 so there is no reason to supply that as well.
+*/
+
+static double
+cubic_kernel (double x, double r)
+{
+    return general_cubic (x, r, 0.0, 0.5);
+}
+
+/* PIXMAN_KERNEL_MITCHELL: Cubic recommended by the Mitchell-Netravali
+   paper.  This has negative values and because the values at +/-1 are
+   not zero it does not interpolate the pixels, meaning it will change
+   an image even if there is no translation.
+*/
+
+static double
+mitchell_kernel (double x, double r)
+{
+    return general_cubic (x, r, 1/3.0, 1/3.0);
+}
+
+/* PIXMAN_KERNEL_NOTCH: Cubic recommended by the Mitchell-Netravali
+   paper to remove postaliasing artifacts. This does not remove
+   aliasing already present in the source image, though it may appear
+   to due to it's excessive blurriness. In any case this is more
+   useful than gaussian for image reconstruction.
+*/
+
+static double
+notch_kernel (double x, double r)
+{
+    return general_cubic (x, r, 1.5, -0.25);
+}
+
+/* PIXMAN_KERNEL_LANCZOS3: lanczos windowed sinc function from -3 to
+   +3. Very popular with high-end software though I think any
+   advantage over cubics is hidden by quantization and programming
+   mistakes. You will see LANCZOS5 or even 7 sometimes.
+*/
+
+static double
+sinc (double x)
+{
+    return x ? sin (M_PI * x) / (M_PI * x) : 1.0;
+}
+
+static double
+lanczos (double x, double n)
+{
+    return fabs (x) < n ? sinc (x) * sinc (x * (1.0 / n)) : 0.0;
+}
+
+static double
+lanczos3_kernel (double x, double r)
+{
+    if (r < 1.0)
+	return
+	    lanczos3_kernel (x * 2 - .5, r * 2) +
+	    lanczos3_kernel (x * 2 + .5, r * 2);
+    else
+	return lanczos (x / r, 3.0);
+}
+
+static int
+lanczos3_width (double r)
+{
+    return MAX (2, ceil (r * 6));
+}
+
+/* PIXMAN_KERNEL_LANCZOS3_STRETCHED - The LANCZOS3 kernel widened by
+   4/3.  Recommended by Jim Blinn
+   http://graphics.cs.cmu.edu/nsp/course/15-462/Fall07/462/papers/jaggy.pdf
+*/
+
+static double
+nice_kernel (double x, double r)
+{
+    return lanczos3_kernel (x, r * (4.0/3));
+}
+
+static int
+nice_width (double r)
+{
+    return MAX (2.0, ceil (r * 8));
+}
+
+/* PIXMAN_KERNEL_TENT: Triangle of width 2r. Lots of software uses
+   this as a "better" filter, twice the size of a box but smaller than
+   a cubic.
+
+   When r == 1.0, PIXMAN_KERNEL_BOX, PIXMAN_KERNEL_LINEAR, and
+   PIXMAN_KERNEL_TENT all produce the same filter, allowing
+   them to be exchanged at this point.
+*/
+
+static double
+tent_kernel (double x, double r)
+{
+    if (r < 1.0)
+	return box_kernel(x, r);
+    else
+	return MAX (1.0 - fabs(x / r), 0.0);
+}
+
+static int
+tent_width (double r)
+{
+    return r < 1.0 ? 2 : ceil(2 * r);
+}
+
+
+static const filter_info_t filters[] =
+{
+    { KERNEL_IMPULSE,		impulse_kernel,   impulse_width },
+    { KERNEL_BOX,		box_kernel,       box_width },
+    { KERNEL_LINEAR,		linear_kernel,    linear_width },
+    { KERNEL_MITCHELL,		mitchell_kernel,  cubic_width },
+    { KERNEL_NOTCH,		notch_kernel,     cubic_width },
+    { KERNEL_CATMULL_ROM,	cubic_kernel,     cubic_width },
+    { KERNEL_LANCZOS3,		lanczos3_kernel,  lanczos3_width },
+    { KERNEL_LANCZOS3_STRETCHED,nice_kernel,      nice_width },
+    { KERNEL_TENT,		tent_kernel,	  tent_width }
+};
+
+/* Fills in one dimension of the filter array */
+static void get_filter(kernel_t filter, double r,
+		       int width, int subsample,
+		       pixman_fixed_t* out)
+{
+    int i;
+    pixman_fixed_t *p = out;
+    int n_phases = 1 << subsample;
+    double step = 1.0 / n_phases;
+    kernel_func_t func = filters[filter].func;
+
+    /* special-case the impulse filter: */
+    if (width <= 1)
+    {
+	for (i = 0; i < n_phases; ++i)
+	    *p++ = pixman_fixed_1;
+	return;
+    }
+
+    for (i = 0; i < n_phases; ++i)
+    {
+	double frac = (i + .5) * step;
+	/* Center of left-most pixel: */
+	double x1 = ceil (frac - width / 2.0 - 0.5) - frac + 0.5;
+	double total = 0;
+	pixman_fixed_t new_total = 0;
+	int j;
+
+	for (j = 0; j < width; ++j)
+	{
+	    double v = func(x1 + j, r);
+	    total += v;
+	    p[j] = pixman_double_to_fixed (v);
+	}
+
+	/* Normalize */
+        total = 1 / total;
+	for (j = 0; j < width; ++j)
+	    new_total += (p[j] *= total);
+
+	/* Put any error on center pixel */
+	p[width / 2] += (pixman_fixed_1 - new_total);
+
+	p += width;
+    }
+}
+
+
+/* Create the parameter list for a SEPARABLE_CONVOLUTION filter
+ * with the given kernels and scale parameters. 
+ */
+static pixman_fixed_t *
+create_separable_convolution (int *n_values,
+			      kernel_t xfilter,
+			      double sx,
+			      kernel_t yfilter,
+			      double sy)
+{
+    int xwidth, xsubsample, ywidth, ysubsample, size_x, size_y;
+    pixman_fixed_t *params;
+
+    xwidth = filters[xfilter].width(sx);
+    xsubsample = 0;
+    if (xwidth > 1)
+	while (sx * (1 << xsubsample) <= 128.0) xsubsample++;
+    size_x = (1 << xsubsample) * xwidth;
+
+    ywidth = filters[yfilter].width(sy);
+    ysubsample = 0;
+    if (ywidth > 1)
+	while (sy * (1 << ysubsample) <= 128.0) ysubsample++;
+    size_y = (1 << ysubsample) * ywidth;
+
+    *n_values = 4 + size_x + size_y;
+    params = malloc (*n_values * sizeof (pixman_fixed_t));
+    if (!params) return 0;
+
+    params[0] = pixman_int_to_fixed (xwidth);
+    params[1] = pixman_int_to_fixed (ywidth);
+    params[2] = pixman_int_to_fixed (xsubsample);
+    params[3] = pixman_int_to_fixed (ysubsample);
+
+    get_filter(xfilter, sx, xwidth, xsubsample, params + 4);
+    get_filter(yfilter, sy, ywidth, ysubsample, params + 4 + size_x);
+
+    return params;
+}
+
+/* ========================================================================== */
 
 static cairo_bool_t
 _pixman_image_set_properties (pixman_image_t *pixman_image,
@@ -605,16 +918,58 @@ _pixman_image_set_properties (pixman_image_t *pixman_image,
     else
     {
 	pixman_filter_t pixman_filter;
+	kernel_t kernel;
+	double dx, dy;
+
+	/* Compute scale factors from the pattern matrix. These scale
+	 * factors are from user to pattern space, and as such they
+	 * are greater than 1.0 for downscaling and less than 1.0 for
+	 * upscaling. The factors are the size of an axis-aligned
+	 * rectangle with the same area as the parallelgram a 1x1
+	 * square transforms to.
+	 */
+	dx = hypot (pattern->matrix.xx, pattern->matrix.xy);
+	dy = hypot (pattern->matrix.yx, pattern->matrix.yy);
+
+	/* Clip at maximum pixman_fixed number. Besides making it
+	 * passable to pixman, this avoids errors from inf and nan.
+	 */
+	if (! (dx < 0x7FFF)) dx = 0x7FFF;
+	if (! (dy < 0x7FFF)) dy = 0x7FFF;
 
 	switch (pattern->filter) {
 	case CAIRO_FILTER_FAST:
 	    pixman_filter = PIXMAN_FILTER_FAST;
 	    break;
 	case CAIRO_FILTER_GOOD:
-	    pixman_filter = PIXMAN_FILTER_GOOD;
+	    pixman_filter = PIXMAN_FILTER_SEPARABLE_CONVOLUTION;
+	    kernel = KERNEL_BOX;
+	    /* Clip the filter size to prevent extreme slowness. This
+	       value could be raised if 2-pass filtering is done */
+	    if (dx > 16.0) dx = 16.0;
+	    if (dy > 16.0) dy = 16.0;
+	    /* Match the bilinear filter for scales > .75: */
+	    if (dx < 1.0/0.75) dx = 1.0;
+	    if (dy < 1.0/0.75) dy = 1.0;
 	    break;
 	case CAIRO_FILTER_BEST:
-	    pixman_filter = PIXMAN_FILTER_BEST;
+	    pixman_filter = PIXMAN_FILTER_SEPARABLE_CONVOLUTION;
+	    kernel = KERNEL_CATMULL_ROM; /* LANCZOS3 is better but not much */
+	    /* Clip the filter size to prevent extreme slowness. This
+	       value could be raised if 2-pass filtering is done */
+	    if (dx > 16.0) { dx = 16.0; kernel = KERNEL_BOX; }
+	    /* blur up to 2x scale, then blend to square pixels for larger: */
+	    else if (dx < 1.0) {
+		if (dx < 1.0/128) dx = 1.0/127;
+		else if (dx < 0.5) dx = 1.0 / (1.0 / dx - 1.0);
+		else dx = 1.0;
+	    }
+	    if (dy > 16.0) { dy = 16.0; kernel = KERNEL_BOX; }
+	    else if (dy < 1.0) {
+		if (dy < 1.0/128) dy = 1.0/127;
+		else if (dy < 0.5) dy = 1.0 / (1.0 / dy - 1.0);
+		else dy = 1.0;
+	    }
 	    break;
 	case CAIRO_FILTER_NEAREST:
 	    pixman_filter = PIXMAN_FILTER_NEAREST;
@@ -632,7 +987,17 @@ _pixman_image_set_properties (pixman_image_t *pixman_image,
 	    pixman_filter = PIXMAN_FILTER_BEST;
 	}
 
-	pixman_image_set_filter (pixman_image, pixman_filter, NULL, 0);
+	if (pixman_filter == PIXMAN_FILTER_SEPARABLE_CONVOLUTION) {
+	    int n_params;
+	    pixman_fixed_t *params;
+	    params = create_separable_convolution
+		(&n_params, kernel, dx, kernel, dy);
+	    pixman_image_set_filter (pixman_image, pixman_filter,
+				     params, n_params);
+	    free (params);
+	} else {
+	    pixman_image_set_filter (pixman_image, pixman_filter, NULL, 0);
+	}
     }
 
     {
@@ -835,7 +1200,7 @@ _pixman_image_for_recording (cairo_image_surface_t *dst,
 done:
     /* filter with gaussian */
     blurred_surface = _cairo_image_gaussian_filter (clone,  &pattern->base);
-
+    
     pixman_image = pixman_image_ref (((cairo_image_surface_t *)blurred_surface)->pixman_image);
     cairo_surface_destroy (blurred_surface);
     cairo_surface_destroy (clone);
@@ -852,16 +1217,6 @@ done:
     }
 
     return pixman_image;
-}
-
-static inline cairo_bool_t
-_surface_type_is_image_buffer (cairo_surface_type_t type)
-{
-#if CAIRO_HAS_TG_SURFACE
-    return type == CAIRO_SURFACE_TYPE_IMAGE || type == CAIRO_SURFACE_TYPE_TG;
-#else
-    return type == CAIRO_SURFACE_TYPE_IMAGE;
-#endif
 }
 
 static pixman_image_t *
@@ -886,27 +1241,26 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 					   is_mask, extents, sample,
 					   ix, iy);
 
-    if (_surface_type_is_image_buffer (pattern->surface->type) &&
+    if (pattern->surface->type == CAIRO_SURFACE_TYPE_IMAGE &&
 	(! is_mask || ! pattern->base.has_component_alpha ||
 	 (pattern->surface->content & CAIRO_CONTENT_COLOR) == 0))
     {
 	cairo_surface_t *defer_free = NULL;
 	cairo_image_surface_t *source = (cairo_image_surface_t *) pattern->surface;
-	cairo_image_buffer_t image_buffer;
+	cairo_surface_type_t type;
 
 	if (_cairo_surface_is_snapshot (&source->base)) {
 	    defer_free = _cairo_surface_snapshot_get_target (&source->base);
 	    source = (cairo_image_surface_t *) defer_free;
 	}
 
-	if (_surface_type_is_image_buffer (source->base.backend->type)) {
-	    _get_image_buffer (source, &image_buffer);
-
+	type = source->base.backend->type;
+	if (type == CAIRO_SURFACE_TYPE_IMAGE) {
 	    if (extend != CAIRO_EXTEND_NONE &&
 		sample->x >= 0 &&
 		sample->y >= 0 &&
-		sample->x + sample->width  <= image_buffer.width &&
-		sample->y + sample->height <= image_buffer.height)
+		sample->x + sample->width  <= source->width &&
+		sample->y + sample->height <= source->height)
 	    {
 		extend = CAIRO_EXTEND_NONE;
 	    }
@@ -914,8 +1268,8 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 	    if (sample->width == 1 && sample->height == 1) {
 		if (sample->x < 0 ||
 		    sample->y < 0 ||
-		    sample->x >= image_buffer.width ||
-		    sample->y >= image_buffer.height)
+		    sample->x >= source->width ||
+		    sample->y >= source->height)
 		{
 		    if (extend == CAIRO_EXTEND_NONE) {
 			cairo_surface_destroy (defer_free);
@@ -924,7 +1278,8 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 		}
 		else
 		{
-		    pixman_image = _pixel_to_solid (&image_buffer, sample->x, sample->y);
+		    pixman_image = _pixel_to_solid (source,
+						    sample->x, sample->y);
                     if (pixman_image) {
 			cairo_surface_destroy (defer_free);
                         return pixman_image;
@@ -948,16 +1303,16 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 		    return blurred_pixman_image;
 		}
 		else
-		return pixman_image_ref (image_buffer.pixman_image);
+		    return pixman_image_ref (source->pixman_image);
 	    }
 #endif
 
 	    if (pattern->base.filter != CAIRO_FILTER_GAUSSIAN) {
-	    pixman_image = pixman_image_create_bits (image_buffer.pixman_format,
-						     image_buffer.width,
-						     image_buffer.height,
-						     (uint32_t *) image_buffer.data,
-						     image_buffer.stride);
+		pixman_image = pixman_image_create_bits (source->pixman_format,
+							 source->width,
+							 source->height,
+							 (uint32_t *) source->data,
+							 source->stride);
 		if (unlikely (pixman_image == NULL)) {
 		    cairo_surface_destroy (defer_free);
 		    if (blurred_surface)
@@ -975,14 +1330,12 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 	    }
 	    else
 		blurred_surface = _cairo_image_gaussian_filter (&source->base,  &pattern->base);
-	} else if (source->base.backend->type == CAIRO_SURFACE_TYPE_SUBSURFACE) {
+	} else if (type == CAIRO_SURFACE_TYPE_SUBSURFACE) {
 	    cairo_surface_subsurface_t *sub;
 	    cairo_bool_t is_contained = FALSE;
 
 	    sub = (cairo_surface_subsurface_t *) source;
-	    source = sub->target;
-
-	    _get_image_buffer (source, &image_buffer);
+	    source = (cairo_image_surface_t *) sub->target;
 
 	    if (sample->x >= 0 &&
 		sample->y >= 0 &&
@@ -994,7 +1347,7 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 
 	    if (sample->width == 1 && sample->height == 1) {
 		if (is_contained) {
-		    pixman_image = _pixel_to_solid (&image_buffer,
+		    pixman_image = _pixel_to_solid (source,
                                                     sub->extents.x + sample->x,
                                                     sub->extents.y + sample->y);
                     if (pixman_image)
@@ -1025,16 +1378,16 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 
 	    /* Avoid sub-byte offsets, force a copy in that case. */
 	    if (pattern->base.filter != CAIRO_FILTER_GAUSSIAN) {
-	    if (PIXMAN_FORMAT_BPP (image_buffer.pixman_format) >= 8) {
-		if (is_contained) {
-		    void *data = image_buffer.data
-			+ sub->extents.x * PIXMAN_FORMAT_BPP(image_buffer.pixman_format)/8
-			+ sub->extents.y * image_buffer.stride;
-		    pixman_image = pixman_image_create_bits (image_buffer.pixman_format,
-							     sub->extents.width,
-							     sub->extents.height,
-							     data,
-							     image_buffer.stride);
+		if (PIXMAN_FORMAT_BPP (source->pixman_format) >= 8) {
+		    if (is_contained) {
+			void *data = source->data
+			    + sub->extents.x * PIXMAN_FORMAT_BPP(source->pixman_format)/8
+			    + sub->extents.y * source->stride;
+			pixman_image = pixman_image_create_bits (source->pixman_format,
+								 sub->extents.width,
+								 sub->extents.height,
+								 data,
+							 	 source->stride);
 			if (unlikely (pixman_image == NULL)) {
 			    if (blurred_surface)
 				cairo_surface_destroy (blurred_surface);
@@ -1087,7 +1440,7 @@ _pixman_image_for_surface (cairo_image_surface_t *dst,
 	}
 	else
 	/* filter with gaussian */
-		blurred_surface = _cairo_image_gaussian_filter (&image->base,  &pattern->base);
+   	    blurred_surface = _cairo_image_gaussian_filter (&image->base,  &pattern->base);
 
 	cleanup = malloc (sizeof (*cleanup));
 	if (unlikely (cleanup == NULL)) {

@@ -119,7 +119,7 @@ _cairo_gl_copy_texture (cairo_gl_surface_t *surface,
 
     /* paint image to dst */
     _cairo_pattern_init_for_surface (&pattern, &image->base);
-    cairo_matrix_init_translate (&pattern.base.matrix,
+    cairo_matrix_init_translate (&pattern.base.matrix, 
 				 -dst_x + src_x, -dst_y + src_y);
 
     rect.x = dst_x;
@@ -231,7 +231,7 @@ _cairo_gl_image_cache_replace_image (cairo_gl_image_t *image_node,
 {
     cairo_int_status_t status;
     /* Paint image to cache. */
-    status = _cairo_gl_copy_texture (dst, cache_surface,
+    status = _cairo_gl_copy_texture (dst, cache_surface, 
 				     image, image_node->node.x,
 				     image_node->node.y,
 			  	     0, 0,
@@ -256,7 +256,7 @@ _cairo_gl_image_cache_add_image (cairo_gl_context_t *ctx,
 
     if (! image->base.device ||
 	(image->width >= IMAGE_CACHE_MAX_SIZE ||
-	image->height >= IMAGE_CACHE_MAX_SIZE))
+	 image->height >= IMAGE_CACHE_MAX_SIZE))
 	return CAIRO_INT_STATUS_UNSUPPORTED;
     else if (! _cairo_gl_surface_is_texture (image))
         return CAIRO_INT_STATUS_UNSUPPORTED;
@@ -350,7 +350,7 @@ _cairo_gl_image_cache_add_image (cairo_gl_context_t *ctx,
     status = _cairo_gl_copy_texture (dst, ctx->image_cache->surface,
 				     image, node->x, node->y,
 				     0, 0,
-				     image->width, image->height,
+				     image->width, image->height, 
 				     FALSE, &ctx);
     if (unlikely (status))
 	return status;
@@ -528,7 +528,7 @@ _cairo_gl_subsurface_operand_init (cairo_gl_operand_t *operand,
     operand->texture.texgen = use_texgen;
 
 
-    if (blur_surface == surface &&
+    if (blur_surface == surface && 
 	surface->needs_to_cache &&
 	surface->base.device) {
         status = _cairo_gl_context_acquire (dst->base.device, &ctx);
@@ -562,11 +562,10 @@ _cairo_gl_subsurface_operand_init (cairo_gl_operand_t *operand,
 	    operand->texture.p2.x = (double) blur_extents.width / (double) blur_surface->width;
 	    operand->texture.p2.y = (double) blur_extents.height / (double) blur_surface->height;
 
-		operand->texture.p1.x += 0.5 / blur_surface->width;
-		operand->texture.p1.y += 0.5 / blur_surface->height;
-		operand->texture.p2.x -= 0.5 / blur_surface->width;
-		operand->texture.p2.y -= 0.5 / blur_surface->height;
-
+	    operand->texture.p1.x += 0.5 / blur_surface->width;
+	    operand->texture.p1.y += 0.5 / blur_surface->height;
+	    operand->texture.p2.x -= 0.5 / blur_surface->width;
+	    operand->texture.p2.y -= 0.5 / blur_surface->height;
 
 	    operand->texture.surface = blur_surface;
 	    operand->texture.owns_surface = NULL;
@@ -597,19 +596,18 @@ _cairo_gl_subsurface_operand_init (cairo_gl_operand_t *operand,
 	operand->texture.p2.x = image_node->p2.x;
 	operand->texture.p2.y = image_node->p2.y;
 
-	    operand->texture.p1.x += 0.5 / ctx->image_cache->surface->width;
-	    operand->texture.p1.y += 0.5 / ctx->image_cache->surface->height;
-	    operand->texture.p2.x -= 0.5 / ctx->image_cache->surface->width;
-	    operand->texture.p2.y -= 0.5 / ctx->image_cache->surface->height;
-
+	operand->texture.p1.x += 0.5 / ctx->image_cache->surface->width;
+	operand->texture.p1.y += 0.5 / ctx->image_cache->surface->height;
+	operand->texture.p2.x -= 0.5 / ctx->image_cache->surface->width;
+	operand->texture.p2.y -= 0.5 / ctx->image_cache->surface->height;
 
 	cairo_matrix_multiply (&attributes->matrix,
 			       &matrix,
 			       &ctx->image_cache->surface->operand.texture.attributes.matrix);
     }
+    cairo_surface_destroy (&blur_surface->base);
 
     status = CAIRO_STATUS_SUCCESS;
-    cairo_surface_destroy (&blur_surface->base);
 
     if (ctx_acquired)
 	return _cairo_gl_context_release (ctx, status);
@@ -674,8 +672,8 @@ _cairo_gl_surface_operand_init (cairo_gl_operand_t *operand,
 
     operand->texture.texgen = use_texgen;
 
-    if (surface->base.device &&
-	blur_surface == surface &&
+    if (surface->base.device  &&
+	blur_surface == surface && 
 	surface->needs_to_cache) {
         status = _cairo_gl_context_acquire (dst->base.device, &ctx);
         if (status == CAIRO_INT_STATUS_SUCCESS) {
@@ -703,11 +701,10 @@ _cairo_gl_surface_operand_init (cairo_gl_operand_t *operand,
 	    operand->texture.p2.x = (double) blur_extents.width / (double) blur_surface->width;
 	    operand->texture.p2.y = (double) blur_extents.height / (double) blur_surface->height;
 
-		operand->texture.p1.x += 0.5 / blur_surface->width;
-		operand->texture.p1.y += 0.5 / blur_surface->height;
-		operand->texture.p2.x -= 0.5 / blur_surface->width;
-		operand->texture.p2.y -= 0.5 / blur_surface->height;
-
+	    operand->texture.p1.x += 0.5 / blur_surface->width;
+	    operand->texture.p1.y += 0.5 / blur_surface->height;
+	    operand->texture.p2.x -= 0.5 / blur_surface->width;
+	    operand->texture.p2.y -= 0.5 / blur_surface->height;
 
 	    operand->texture.surface = blur_surface;
 	    operand->texture.owns_surface = NULL;
@@ -733,11 +730,10 @@ _cairo_gl_surface_operand_init (cairo_gl_operand_t *operand,
 	operand->texture.p2.x = image_node->p2.x;
 	operand->texture.p2.y = image_node->p2.y;
 
-	    operand->texture.p1.x += 0.5 / ctx->image_cache->surface->width;
-	    operand->texture.p1.y += 0.5 / ctx->image_cache->surface->height;
-	    operand->texture.p2.x -= 0.5 / ctx->image_cache->surface->width;
-	    operand->texture.p2.y -= 0.5 / ctx->image_cache->surface->height;
-
+	operand->texture.p1.x += 0.5 / ctx->image_cache->surface->width;
+	operand->texture.p1.y += 0.5 / ctx->image_cache->surface->height;
+	operand->texture.p2.x -= 0.5 / ctx->image_cache->surface->width;
+	operand->texture.p2.y -= 0.5 / ctx->image_cache->surface->height;
 
 	operand->texture.surface = ctx->image_cache->surface;
 	operand->texture.owns_surface = NULL;
@@ -749,9 +745,9 @@ _cairo_gl_surface_operand_init (cairo_gl_operand_t *operand,
 			       &ctx->image_cache->surface->operand.texture.attributes.matrix);
     }
 
-    cairo_surface_destroy (&blur_surface->base);
 
     status = CAIRO_STATUS_SUCCESS;
+    cairo_surface_destroy (&blur_surface->base);
 
     if (ctx_acquired)
 	return _cairo_gl_context_release (ctx, status);
@@ -825,7 +821,7 @@ _cairo_gl_pattern_texture_setup (cairo_gl_operand_t *operand,
     operand->texture.attributes.matrix.x0 -= extents->x * operand->texture.attributes.matrix.xx;
     operand->texture.attributes.matrix.y0 -= extents->y * operand->texture.attributes.matrix.yy;
 
-    if (_cairo_gl_surface_is_texture (dst) &&
+    if (_cairo_gl_surface_is_texture (dst) && 
         dst->width <= IMAGE_CACHE_MAX_SIZE &&
         dst->height <= IMAGE_CACHE_MAX_SIZE &&
 	! dst->force_no_cache)
@@ -1128,7 +1124,7 @@ _cairo_gl_operand_get_gl_filter (cairo_gl_operand_t *operand)
 cairo_bool_t
 _cairo_gl_operand_get_use_atlas (cairo_gl_operand_t *operand)
 {
-    if (operand->type != CAIRO_GL_OPERAND_TEXTURE &&
+    if (operand->type != CAIRO_GL_OPERAND_TEXTURE && 
 	operand->type != CAIRO_GL_OPERAND_GAUSSIAN)
 	return FALSE;
 
@@ -1201,30 +1197,27 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	    return;
 
 	_cairo_gl_shader_bind_vec4 (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					CAIRO_GL_UNIFORM_CONSTANT, tex_unit),
-				    operand->constant.color[0],
-				    operand->constant.color[1],
-				    operand->constant.color[2],
-				    operand->constant.color[3]);
-        return;
+                                    ctx->current_shader->constant_location[tex_unit],
+                                    operand->constant.color[0],
+                                    operand->constant.color[1],
+                                    operand->constant.color[2],
+                                    operand->constant.color[3]);
+	return;
+
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE:
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT:
 	_cairo_gl_shader_bind_float  (ctx,
-				      _cairo_gl_shader_uniform_for_texunit (
-					  CAIRO_GL_UNIFORM_A, tex_unit),
+				      ctx->current_shader->a_location[tex_unit],
 				      operand->gradient.a);
 	/* fall through */
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0:
-	_cairo_gl_shader_bind_vec3 (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					CAIRO_GL_UNIFORM_CIRCLE_D, tex_unit),
+	_cairo_gl_shader_bind_vec3   (ctx,
+				      ctx->current_shader->circle_d_location[tex_unit],
 				      operand->gradient.circle_d.center.x,
 				      operand->gradient.circle_d.center.y,
 				      operand->gradient.circle_d.radius);
 	_cairo_gl_shader_bind_float  (ctx,
-				      _cairo_gl_shader_uniform_for_texunit (
-					  CAIRO_GL_UNIFORM_RADIUS_0, tex_unit),
+				      ctx->current_shader->radius_0_location[tex_unit],
 				      operand->gradient.radius_0);
         /* fall through */
     case CAIRO_GL_OPERAND_LINEAR_GRADIENT:
@@ -1252,8 +1245,7 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	    }
 	    if (operand->type != CAIRO_GL_OPERAND_GAUSSIAN)
 		_cairo_gl_shader_bind_vec2 (ctx,
-					    _cairo_gl_shader_uniform_for_texunit (
-						CAIRO_GL_UNIFORM_TEXDIMS, tex_unit),
+					    ctx->current_shader->texdims_location[tex_unit],
 					    width, height);
 	}
 
@@ -1266,60 +1258,52 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	float y_axis = 0.0;
 	float temp_width;
 	float near_zero = 0.00001;
+        _cairo_gl_shader_bind_float (ctx,
+                                     ctx->current_shader->blur_x_axis_location[tex_unit],
+                                     x_axis);
 
-	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_X_AXIS, tex_unit),
-				    x_axis);
-	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_Y_AXIS, tex_unit),
-				    y_axis);
+        _cairo_gl_shader_bind_float (ctx,
+                                     ctx->current_shader->blur_y_axis_location[tex_unit],
+				     y_axis);
+
 	_cairo_gl_shader_bind_int (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_RADIUS, tex_unit),
-				    operand->texture.x_radius);
+				   ctx->current_shader->blur_radius_location[tex_unit],
+				   operand->texture.x_radius);
 
 	temp_width = cairo_gl_surface_get_width (&operand->texture.surface->base);
 	temp_width = (temp_width == 0) ? near_zero : temp_width;
 
 	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_STEP, tex_unit),
-				    1.0 / temp_width);
+                                     ctx->current_shader->blur_step_location[tex_unit],
+				     1.0 / temp_width);
 
 	_cairo_gl_shader_bind_float_array (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLURS, tex_unit),
-				    operand->texture.x_radius * 2 + 1,
-				    &operand->texture.coef[0]);
+                                           ctx->current_shader->blurs_location [tex_unit],
+				           operand->texture.x_radius * 2 + 1,
+				           operand->texture.coef);
     }
     else if (operand->type == CAIRO_GL_OPERAND_GAUSSIAN &&
 	     operand->pass == 2) {
 	float x_axis = 0.0;
 	float y_axis = 1.0;
+        _cairo_gl_shader_bind_float (ctx,
+                                      ctx->current_shader->blur_x_axis_location[tex_unit],
+                                      x_axis);
 
-	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_X_AXIS, tex_unit),
-				    x_axis);
-	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_Y_AXIS, tex_unit),
-				    y_axis);
+        _cairo_gl_shader_bind_float (ctx,
+                                      ctx->current_shader->blur_y_axis_location[tex_unit],
+                                      y_axis);
+
 	_cairo_gl_shader_bind_int (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_RADIUS, tex_unit),
-				    operand->texture.y_radius);
+                                   ctx->current_shader->blur_radius_location[tex_unit],
+				   operand->texture.y_radius);
 
-	_cairo_gl_shader_bind_float (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLUR_STEP, tex_unit),
-				    1.0 / cairo_gl_surface_get_height (&operand->texture.surface->base));
+	_cairo_gl_shader_bind_float (ctx, 
+                                     ctx->current_shader->blur_step_location[tex_unit],
+				     1.0 / cairo_gl_surface_get_height (&operand->texture.surface->base));
 
 	_cairo_gl_shader_bind_float_array (ctx,
-				    _cairo_gl_shader_uniform_for_texunit (
-					    CAIRO_GL_UNIFORM_BLURS, tex_unit),
+                                    ctx->current_shader->blurs_location[tex_unit],
 				    operand->texture.y_radius * 2 + 1,
 				    &operand->texture.coef[0]);
     }
@@ -1332,12 +1316,10 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	    if (operand->gradient.texgen)
 		    texgen = &operand->gradient.m;
     }
-
     if (texgen) {
-	_cairo_gl_shader_bind_matrix (ctx,
-				      _cairo_gl_shader_uniform_for_texunit (
-					  CAIRO_GL_UNIFORM_TEXGEN, tex_unit),
-				      texgen);
+	    _cairo_gl_shader_bind_matrix(ctx,
+					 ctx->current_shader->texgen_location[tex_unit],
+					 texgen);
     }
 }
 

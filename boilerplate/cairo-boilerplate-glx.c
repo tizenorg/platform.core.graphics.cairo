@@ -82,13 +82,13 @@ _cairo_boilerplate_gl_create_surface (const char		*name,
 			   GLX_BLUE_SIZE, 1,
 			   GLX_ALPHA_SIZE, 1,
 			   GLX_DOUBLEBUFFER,
-			   None };
+			   GLX_NONE };
     int rgb_attribs[] = { GLX_RGBA,
 			  GLX_RED_SIZE, 1,
 			  GLX_GREEN_SIZE, 1,
 			  GLX_BLUE_SIZE, 1,
 			  GLX_DOUBLEBUFFER,
-			  None };
+			  GLX_NONE };
     XVisualInfo *visinfo;
     GLXContext ctx;
     gl_target_closure_t *gltc;
@@ -134,6 +134,9 @@ _cairo_boilerplate_gl_create_surface (const char		*name,
 
     gltc->ctx = ctx;
     gltc->device = cairo_glx_device_create (dpy, ctx);
+
+    if (mode == CAIRO_BOILERPLATE_MODE_PERF)
+	cairo_gl_device_set_thread_aware(gltc->device, FALSE);
 
     gltc->surface = surface = cairo_gl_surface_create (gltc->device,
 						       content, width, height);
@@ -233,7 +236,7 @@ _cairo_boilerplate_gl_create_window (const char		       *name,
 			   GLX_BLUE_SIZE, 1,
 			   GLX_ALPHA_SIZE, 1,
 			   GLX_DOUBLEBUFFER,
-			   None };
+			   GLX_NONE };
 
     gltc = calloc (1, sizeof (gl_target_closure_t));
     *closure = gltc;
@@ -265,7 +268,7 @@ _cairo_boilerplate_gl_create_window_msaa (const char		       *name,
 			   GLX_SAMPLES, 4,
 			   GLX_SAMPLE_BUFFERS, 1,
 			   GLX_DOUBLEBUFFER,
-			   None };
+			   GLX_NONE };
 
     gltc = calloc (1, sizeof (gl_target_closure_t));
     *closure = gltc;
@@ -296,7 +299,7 @@ _cairo_boilerplate_gl_create_window_db (const char		  *name,
 			   GLX_BLUE_SIZE, 1,
 			   GLX_ALPHA_SIZE, 1,
 			   GLX_DOUBLEBUFFER,
-			   None };
+			   GLX_NONE };
 
     gltc = calloc (1, sizeof (gl_target_closure_t));
     *closure = gltc;

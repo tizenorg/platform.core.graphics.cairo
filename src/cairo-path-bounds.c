@@ -221,7 +221,7 @@ _cairo_path_fixed_approximate_stroke_exact_extents (const cairo_path_fixed_t *pa
 	box_extents.p1.y -= _cairo_fixed_from_double (dy);
 	box_extents.p2.x += _cairo_fixed_from_double (dx);
 	box_extents.p2.y += _cairo_fixed_from_double (dy);
-
+    
 	_cairo_box_to_doubles (&box_extents, &x1, &y1, &x2, &y2);
 
 	extents->x = x1;

@@ -49,8 +49,8 @@
 
 #define MAX_BLUR_SIZE 256
 
-cairo_private cairo_surface_t *
-_cairo_image_gaussian_filter (cairo_surface_t *src,
+cairo_private cairo_surface_t * 
+_cairo_image_gaussian_filter (cairo_surface_t *src, 
 			      const cairo_pattern_t *pattern);
 
 #endif /* CAIRO_IMAGE_FILTERS_PRIVATE_H */

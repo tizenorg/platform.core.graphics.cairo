@@ -32,7 +32,6 @@
  */
 
 #include "cairo-boilerplate-private.h"
-
 #include <cairo-gl.h>
 #include <cairo-evas-gl.h>
 #include <Ecore_Evas.h>
@@ -90,7 +89,13 @@ _cairo_boilerplate_evas_gl_create_surface (const char		 *name,
 
     ecore_init ();
     ecore_evas_init ();
+
+#ifdef HAVE_WAYLAND //Wayland (Tizen 3.0)
+    ee = ecore_evas_wayland_egl_new (NULL, 0, 0, 0, ceil (width), ceil (height), EINA_TRUE);
+#else
     ee = ecore_evas_gl_x11_new (NULL, 0, 0, 0, ceil (width), ceil (height));;
+#endif
+
     canvas = ecore_evas_get (ee);
 
     gltc = xcalloc (1, sizeof (evas_gl_target_closure_t));
@@ -99,7 +104,7 @@ _cairo_boilerplate_evas_gl_create_surface (const char		 *name,
     gltc->evas_gl = evas_gl_new (canvas);
     gltc->evas_ctx = evas_gl_context_create (gltc->evas_gl, NULL);
     gltc->evas_api = evas_gl_api_get (gltc->evas_gl);
-
+    
     gltc->device = cairo_evas_gl_device_create (gltc->evas_gl, gltc->evas_ctx);
 
     gltc->surface = surface =

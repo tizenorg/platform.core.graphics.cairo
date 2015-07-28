@@ -51,6 +51,7 @@
 #include "cairo-image-surface-private.h"
 #include "cairo-list-inline.h"
 #include "cairo-pattern-private.h"
+#include "cairo-pixman-private.h"
 #include "cairo-traps-private.h"
 #include "cairo-tristrip-private.h"
 
@@ -99,7 +100,7 @@ set_clip_region (void *_surface,
     _cairo_xlib_surface_ensure_picture (surface);
 
     if (region != NULL) {
-	XRectangle stack_rects[CAIRO_STACK_ARRAY_LENGTH (sizeof (XRectangle))];
+	XRectangle stack_rects[CAIRO_STACK_ARRAY_LENGTH (XRectangle)];
 	XRectangle *rects = stack_rects;
 	int n_rects, i;
 
@@ -1295,6 +1296,9 @@ _cairo_xlib_surface_add_glyph (cairo_xlib_display_t *display,
 	    unsigned char   *d;
 	    unsigned char   *new, *n;
 
+	    if (c == 0)
+		break;
+
 	    new = malloc (c);
 	    if (!new) {
 		status = _cairo_error (CAIRO_STATUS_NO_MEMORY);
@@ -1319,6 +1323,9 @@ _cairo_xlib_surface_add_glyph (cairo_xlib_display_t *display,
 	    unsigned int c = glyph_surface->stride * glyph_surface->height / 4;
 	    const uint32_t *d;
 	    uint32_t *new, *n;
+
+	    if (c == 0)
+		break;
 
 	    new = malloc (4 * c);
 	    if (unlikely (new == NULL)) {
@@ -1478,14 +1485,14 @@ _emit_glyphs_chunk (cairo_xlib_display_t *display,
        */
       if (_start_new_glyph_elt (j, &glyphs[i])) {
 	  if (j) {
-	    elts[nelt].nchars = n;
-	    nelt++;
-	    n = 0;
+	      elts[nelt].nchars = n;
+	      nelt++;
+	      n = 0;
 	  }
 	  elts[nelt].chars = char8 + size * j;
 	  elts[nelt].glyphset = info->glyphset;
-	  elts[nelt].xOff = glyphs[i].i.x - dst_x;
-	  elts[nelt].yOff = glyphs[i].i.y - dst_y;
+	  elts[nelt].xOff = glyphs[i].i.x;
+	  elts[nelt].yOff = glyphs[i].i.y;
       }
 
       switch (width) {
@@ -1588,7 +1595,7 @@ composite_glyphs (void				*surface,
     cairo_xlib_display_t *display = dst->display;
     cairo_int_status_t status = CAIRO_INT_STATUS_SUCCESS;
     cairo_scaled_glyph_t *glyph;
-    cairo_fixed_t x = 0, y = 0;
+    cairo_fixed_t x = dst_x, y = dst_y;
     cairo_xlib_font_glyphset_t *glyphset = NULL, *this_glyphset_info;
 
     unsigned long max_index = 0;
@@ -1606,11 +1613,6 @@ composite_glyphs (void				*surface,
 
     op = _render_operator (op),
     _cairo_xlib_surface_ensure_picture (dst);
-
-#if CAIRO_HAS_TG_SURFACE
-    _cairo_scaled_font_freeze_cache(info->font);
-#endif
-
     for (i = 0; i < num_glyphs; i++) {
 	int this_x, this_y;
 	int old_width;
@@ -1620,7 +1622,7 @@ composite_glyphs (void				*surface,
 					     CAIRO_SCALED_GLYPH_INFO_METRICS,
 					     &glyph);
 	if (unlikely (status))
-	    goto done;
+	    return status;
 
 	this_x = _cairo_lround (glyphs[i].d.x);
 	this_y = _cairo_lround (glyphs[i].d.y);
@@ -1629,7 +1631,7 @@ composite_glyphs (void				*surface,
 	if (glyph->dev_private_key != display) {
 	    status = _cairo_xlib_surface_add_glyph (display, info->font, &glyph);
 	    if (unlikely (status))
-		goto done;
+		return status;
 	}
 
 	this_glyphset_info = glyph->dev_private;
@@ -1681,7 +1683,7 @@ composite_glyphs (void				*surface,
 					 op, src, src_x, src_y,
 					 num_elts, old_width, glyphset);
 	    if (unlikely (status))
-		goto done;
+		return status;
 
 	    glyphs += i;
 	    num_glyphs -= i;
@@ -1725,11 +1727,6 @@ composite_glyphs (void				*surface,
 				     op, src, src_x, src_y,
 				     num_elts, width, glyphset);
     }
-
-done:
-#if CAIRO_HAS_TG_SURFACE
-    _cairo_scaled_font_thaw_cache(info->font);
-#endif
 
     return status;
 }
@@ -2001,7 +1998,7 @@ _cairo_xlib_traps_compositor_get (void)
 	compositor.check_composite = check_composite;
 	compositor.composite = composite;
 	compositor.lerp = lerp;
-	//FIXME:
+	// FIXME:
 	compositor.lerp_color_glyph = lerp;
 	//compositor.check_composite_boxes = check_composite_boxes;
 	compositor.composite_boxes = composite_boxes;

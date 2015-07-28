@@ -106,7 +106,7 @@ _pixman_image_create_convolution_params (double *params,
     return pixman_params;
 }
 
-cairo_surface_t *
+cairo_surface_t * 
 _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *pattern)
 {
     int row, col;
@@ -139,10 +139,10 @@ _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *patt
 
 	row = pattern->y_radius * 2 + 1;
 	col = pattern->x_radius * 2 + 1;
-	width = src_width / pattern->shrink_factor_x;
-	height = src_height / pattern->shrink_factor_y;
+ 	width = src_width / pattern->shrink_factor_x;
+ 	height = src_height / pattern->shrink_factor_y;
 	stride = width * (src_image->stride / src_width);
-
+    
 	clone_image = (cairo_image_surface_t *)
 		cairo_image_surface_create (src_image->format,
 					    src_width, src_height);
@@ -152,7 +152,7 @@ _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *patt
 	    clone_image = (cairo_image_surface_t *)cairo_surface_reference (src);
 	    goto DONE;
 	}
-
+					
 	/* XXX: we must always create a clone because we need to modify
 	 * it transformation, no copy data */
 	temp_image = pixman_image_create_bits (src_image->pixman_format,
@@ -165,7 +165,7 @@ _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *patt
 	    clone_image = (cairo_image_surface_t *)cairo_surface_reference (src);
 	    goto DONE;
 	}
-
+	
 	/* create scratch images */
 	for (i = 0; i < 2; i++) {
 	    scratch_images[i] = pixman_image_create_bits (src_image->pixman_format,
@@ -183,7 +183,7 @@ _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *patt
 	if (width != src_width || height != src_height) {
 	    pixman_image_set_filter (temp_image, PIXMAN_FILTER_NEAREST, NULL, 0);
 	    /* set up transform matrix */
-	    cairo_matrix_init_scale (&matrix,
+ 	    cairo_matrix_init_scale (&matrix, 
 				     (double) src_width / (double) width,
 				     (double) src_height / (double) height);
 	    status = _cairo_matrix_to_pixman_matrix_offset (&matrix,
@@ -264,7 +264,7 @@ _cairo_image_gaussian_filter (cairo_surface_t *src,  const cairo_pattern_t *patt
 
 	/* paint scratch_surfaces[0] to clone */
 	/* set up transform matrix */
-        cairo_matrix_init_scale (&matrix,
+        cairo_matrix_init_scale (&matrix, 
 				 (double) width / (double) src_width,
 				 (double) height / (double) src_height);
         status = _cairo_matrix_to_pixman_matrix_offset (&matrix,

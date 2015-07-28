@@ -363,7 +363,7 @@ _cairo_quartz_gaussian_filter (const cairo_pattern_t *src,
     if (! image_ctx) {
 	free (kernel);
 	*out_image = NULL;
-	return CAIRO_INT_STATUS_NO_MEMORY;
+ 	return CAIRO_INT_STATUS_NO_MEMORY;
     }
 #else
     image_provider = CGImageGetDataProvider (resized_image);

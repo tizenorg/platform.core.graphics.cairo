@@ -111,7 +111,7 @@ _cairo_gl_dispatch_init_entries (cairo_gl_dispatch_t *dispatch,
 static cairo_status_t
 _cairo_gl_dispatch_init_buffers (cairo_gl_dispatch_t *dispatch,
 				 cairo_gl_get_proc_addr_func_t get_proc_addr,
-				 void *data,
+				 void *data, 
 				 int gl_version, cairo_gl_flavor_t gl_flavor)
 {
     cairo_gl_dispatch_name_t dispatch_name;

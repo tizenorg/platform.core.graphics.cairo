@@ -7,7 +7,7 @@
 
 Name:           cairo
 #Version:        1.12.16
-Version:        1.12.14
+Version:        1.14.2
 Release:        0
 License:        LGPL-2.1+ or MPL-1.1
 Summary:        Vector Graphics Library with Cross-Device Output Support
@@ -95,19 +95,19 @@ in-memory image buffers, and PostScript. Cairo is designed to produce
 identical output on all output media while taking advantage of display
 hardware acceleration when available.
 
-#%package tools
-#License:        GPL-3.0+
-#Summary:        Vector Graphics Library with Cross-Device Output Support -- Utilities
-#Group:          Development/Libraries
+%package -n tools
+License:        GPL-3.0+
+Summary:        Vector Graphics Library with Cross-Device Output Support -- Utilities
+Group:          Development/Libraries
 # We need an explicit requires since nothing links to the cairo library
 #Requires:       libcairo = %{version}
 
-#%description tools
-#Cairo is a vector graphics library with cross-device output support.
-#Currently supported output targets include the X Window System,
-#in-memory image buffers, and PostScript. Cairo is designed to produce
-#identical output on all output media while taking advantage of display
-#hardware acceleration when available.
+%description -n tools
+Cairo is a vector graphics library with cross-device output support.
+Currently supported output targets include the X Window System,
+in-memory image buffers, and PostScript. Cairo is designed to produce
+identical output on all output media while taking advantage of display
+hardware acceleration when available.
 
 This package contains various cairo utilities.
 
@@ -203,16 +203,16 @@ make %{?_smp_mflags} V=1
 %license util/cairo-script/COPYING
 %{_libdir}/libcairo-script-interpreter.so.*
 
-#%files tools
-#%manifest %{name}.manifest
-#%defattr(-, root, root)
-#%license util/cairo-trace/COPYING util/cairo-trace/COPYING-GPL-3
-#%{_bindir}/cairo-sphinx
-#%{_bindir}/cairo-trace
-#%dir %{_libdir}/cairo
-#%{_libdir}/cairo/cairo-fdr.so
-#%{_libdir}/cairo/cairo-sphinx.so
-#%{_libdir}/cairo/libcairo-trace.so
+%files -n tools
+%manifest %{name}.manifest
+%defattr(-, root, root)
+%license util/cairo-trace/COPYING util/cairo-trace/COPYING-GPL-3
+%{_bindir}/cairo-sphinx
+%{_bindir}/cairo-trace
+%dir %{_libdir}/cairo
+%{_libdir}/cairo/cairo-fdr.so*
+%{_libdir}/cairo/cairo-sphinx.so*
+%{_libdir}/cairo/libcairo-trace.so*
 
 %files devel
 %manifest %{name}.manifest

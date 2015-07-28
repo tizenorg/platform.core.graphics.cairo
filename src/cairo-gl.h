@@ -130,6 +130,21 @@ cairo_gl_surface_create_for_dc (cairo_device_t		*device,
 				int			 height);
 #endif
 
+#if CAIRO_HAS_CGL_FUNCTIONS
+#include <OpenGL/OpenGL.h>
+
+cairo_public cairo_device_t *
+cairo_cgl_device_create (CGLContextObj ctx);
+
+cairo_public cairo_surface_t *
+cairo_gl_surface_create_for_cgl (cairo_device_t *device,
+				 int		 width,
+				 int		 height);
+
+cairo_public CGLContextObj
+cairo_cgl_device_get_context (cairo_device_t *device);
+#endif
+
 #if CAIRO_HAS_EGL_FUNCTIONS
 #include <EGL/egl.h>
 

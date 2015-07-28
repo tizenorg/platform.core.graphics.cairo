@@ -41,6 +41,14 @@ extern void glFinish (void);
 #include <GL/gl.h>
 #elif CAIRO_HAS_GLESV2_SURFACE
 #include <GLES2/gl2.h>
+#elif CAIRO_HAS_GLESV3_SURFACE
+#include <GLES3/gl3.h>
+#endif
+
+// For Wayland-egl
+#ifdef HAVE_WAYLAND
+#include <wayland-egl.h>
+#include <wayland-client.h>
 #endif
 
 static const cairo_user_data_key_t gl_closure_key;
@@ -91,15 +99,16 @@ _cairo_boilerplate_egl_create_surface (const char		 *name,
 	EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
 #if CAIRO_HAS_GL_SURFACE
 	EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
-#elif CAIRO_HAS_GLESV2_SURFACE
+#elif CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_GLESV3_SURFACE
 	EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 #endif
-	EGL_SAMPLES, 4,
 	EGL_NONE
     };
     const EGLint ctx_attribs[] = {
 #if CAIRO_HAS_GLESV2_SURFACE
 	EGL_CONTEXT_CLIENT_VERSION, 2,
+#elif CAIRO_HAS_GLESV3_SURFACE
+	EGL_CONTEXT_CLIENT_VERSION, 3,
 #endif
 	EGL_NONE
     };
@@ -107,7 +116,15 @@ _cairo_boilerplate_egl_create_surface (const char		 *name,
     gltc = xcalloc (1, sizeof (egl_target_closure_t));
     *closure = gltc;
 
+#ifdef HAVE_WAYLAND
+    static struct wl_display *display;
+    display = wl_display_connect (NULL);
+    struct wl_registry *registry = wl_display_get_registry (display);
+    wl_display_dispatch (display);
+    gltc->dpy = eglGetDisplay (display);
+#else
     gltc->dpy = eglGetDisplay (EGL_DEFAULT_DISPLAY);
+#endif
 
     if (! eglInitialize (gltc->dpy, &major, &minor)) {
 	free (gltc);
@@ -122,7 +139,7 @@ _cairo_boilerplate_egl_create_surface (const char		 *name,
 
 #if CAIRO_HAS_GL_SURFACE
     eglBindAPI (EGL_OPENGL_API);
-#elif CAIRO_HAS_GLESV2_SURFACE
+#elif CAIRO_HAS_GLESV2_SURFACE || CAIRO_HAS_GLESV3_SURFACE
     eglBindAPI (EGL_OPENGL_ES_API);
 #endif
 
@@ -135,7 +152,8 @@ _cairo_boilerplate_egl_create_surface (const char		 *name,
     }
 
     gltc->device = cairo_egl_device_create (gltc->dpy, gltc->ctx);
-	cairo_gl_device_set_thread_aware (gltc->device, FALSE);
+    if (mode == CAIRO_BOILERPLATE_MODE_PERF)
+	cairo_gl_device_set_thread_aware(gltc->device, FALSE);
 
     if (width < 1)
 	width = 1;

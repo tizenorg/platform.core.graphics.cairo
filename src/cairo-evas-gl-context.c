@@ -180,7 +180,7 @@ _cairo_evas_gl_get_proc_addr (void *data, const char *name)
     }
 
     return evas_gl_proc_address_get (gl, name);
-}
+} 
 
 static cairo_bool_t
 _context_acquisition_changed_evas_gl_state (cairo_evas_gl_context_t *ctx,
@@ -204,8 +204,8 @@ _evas_gl_get_current_surface (cairo_evas_gl_context_t *ctx)
 static void
 _evas_gl_query_current_state (cairo_evas_gl_context_t *ctx)
 {
-	ctx->queried_context = evas_gl_current_context_get (ctx->evas_gl);
-	ctx->current_surface = evas_gl_current_surface_get (ctx->evas_gl);
+    ctx->queried_context = evas_gl_current_context_get (ctx->evas_gl);
+    ctx->current_surface = evas_gl_current_surface_get (ctx->evas_gl);
 }
 
 static void
@@ -394,13 +394,13 @@ cairo_gl_surface_create_for_evas_gl (cairo_device_t	*device,
 
 static cairo_bool_t is_evas_gl_device (cairo_device_t *device)
 {
-		return (device->backend != NULL &&
+    return (device->backend != NULL &&
 	    device->backend->type == CAIRO_DEVICE_TYPE_GL);
 }
 
 static cairo_evas_gl_context_t *to_evas_gl_context (cairo_device_t *device)
 {
-	return (cairo_evas_gl_context_t *) device;
+    return (cairo_evas_gl_context_t *) device;
 }
 
 cairo_public Evas_GL *
@@ -412,7 +412,7 @@ cairo_evas_gl_device_get_gl (cairo_device_t *device)
 	return NULL;
 	}
 
-	if (! is_evas_gl_device (device)) {
+    if (! is_evas_gl_device (device)) {
 	_cairo_error_throw (CAIRO_STATUS_DEVICE_TYPE_MISMATCH);
 	return NULL;
     }
