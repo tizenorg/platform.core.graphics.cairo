@@ -54,10 +54,10 @@ AC_CHECK_LIB(wayland-client, wl_display_connect,
      [AC_CHECK_HEADER(wayland-client.h, [
       have_wayland=yes
       AC_DEFINE(HAVE_WAYLAND, 1, [Define to 1 if you have wayland available])
-      wayland_LIBS="-lwayland-client -lwayland-egl"
+      wayland_LIBS="-lwayland-client"
      ],
-     [have_wayland="no (requires wayland-egl)"])],
-     [have_wayland="no (requires wayland-egl)"])
+     [have_wayland="no (requires wayland-client)"])],
+     [have_wayland="no (requires wayland-client)"])
 LIBS="$wayland_LIBS $LIBS"
 
 save_LIBS="$LIBS"
