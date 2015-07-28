@@ -415,7 +415,8 @@ _cairo_win32_display_surface_finish (void *abstract_surface)
 {
     cairo_win32_display_surface_t *surface = abstract_surface;
 
-    if (surface->image) {
+    if (surface->image && to_image_surface(surface->image)->parent) {
+	assert (to_image_surface(surface->image)->parent == &surface->win32.base);
 	/* Unhook ourselves first to avoid the double-unref from the image */
 	to_image_surface(surface->image)->parent = NULL;
 	cairo_surface_finish (surface->image);
@@ -428,6 +429,8 @@ _cairo_win32_display_surface_finish (void *abstract_surface)
 	DeleteObject (surface->bitmap);
 	DeleteDC (surface->win32.dc);
     }
+
+    _cairo_win32_display_surface_discard_fallback (surface);
 
     if (surface->initial_clip_rgn)
 	DeleteObject (surface->initial_clip_rgn);
@@ -452,17 +455,17 @@ _cairo_win32_display_surface_map_to_image (void                    *abstract_sur
 	surface->fallback =
 	    _cairo_win32_display_surface_create_for_dc (surface->win32.dc,
 							surface->win32.format,
-							surface->win32.extents.width,
-							surface->win32.extents.height);
+							surface->win32.extents.x + surface->win32.extents.width,
+							surface->win32.extents.y + surface->win32.extents.height);
 	if (unlikely (status = surface->fallback->status))
 	    goto err;
 
 	if (!BitBlt (to_win32_surface(surface->fallback)->dc,
-		     0, 0,
+		     surface->win32.extents.x, surface->win32.extents.y,
 		     surface->win32.extents.width,
 		     surface->win32.extents.height,
 		     surface->win32.dc,
-		     0, 0,
+		     surface->win32.extents.x, surface->win32.extents.y,
 		     SRCCOPY)) {
 	    status = _cairo_error (CAIRO_STATUS_DEVICE_ERROR);
 	    goto err;
@@ -758,6 +761,7 @@ _cairo_win32_display_surface_discard_fallback (cairo_win32_display_surface_t *su
 	TRACE ((stderr, "%s (surface=%d)\n",
 		__FUNCTION__, surface->win32.base.unique_id));
 
+	cairo_surface_finish (surface->fallback);
 	cairo_surface_destroy (surface->fallback);
 	surface->fallback = NULL;
     }

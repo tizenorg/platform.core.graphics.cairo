@@ -93,7 +93,6 @@ typedef struct _cairo_egl_context {
     EGLSurface dummy_surface;
     EGLSurface current_surface;
 
-    EGLDisplay previous_display;
     EGLContext previous_context;
     EGLSurface previous_surface;
 } cairo_egl_context_t;
@@ -110,8 +109,7 @@ _context_acquisition_changed_egl_state (cairo_egl_context_t *ctx,
 					EGLSurface current_surface)
 {
     return ctx->previous_context != ctx->context ||
-           ctx->previous_surface != current_surface ||
-           ctx->previous_display != ctx->display;
+           ctx->previous_surface != current_surface;
 }
 
 static EGLSurface
@@ -128,19 +126,8 @@ _egl_get_current_surface (cairo_egl_context_t *ctx)
 static void
 _egl_query_current_state (cairo_egl_context_t *ctx)
 {
-    ctx->previous_surface = eglGetCurrentSurface (EGL_DRAW);
     ctx->previous_context = eglGetCurrentContext ();
-    ctx->previous_display = eglGetCurrentDisplay ();
-
-    /* If any of the values were none, assume they are all none. Not all
-       drivers seem well behaved when it comes to using these values across
-       multiple threads. */
-    if (ctx->previous_surface == EGL_NO_SURFACE ||
-        ctx->previous_context == EGL_NO_CONTEXT || ctx->previous_display == EGL_NO_DISPLAY) {
-        ctx->previous_surface = EGL_NO_SURFACE;
-        ctx->previous_context = EGL_NO_CONTEXT;
-        ctx->previous_display = EGL_NO_DISPLAY;
-    }
+    ctx->previous_surface = eglGetCurrentSurface (EGL_DRAW);
 }
 
 static void
@@ -272,7 +259,7 @@ _cairo_egl_get_proc_address (void *data, const char *name)
     };
 
     for (i = 0; func_map[i].name; i++) {
-	if (! strncmp (func_map[i].name, name, strlen(name)))
+	if (! strcmp (func_map[i].name, name))
 	    return func_map[i].func;
     }
 
@@ -351,6 +338,12 @@ cairo_egl_device_create (EGLDisplay dpy, EGLContext egl)
 	free (ctx);
 	return _cairo_gl_context_create_in_error (status);
     }
+
+    /* Tune the default VBO size to reduce overhead on embedded devices.
+     * This smaller size means that flushing needs to be done more often,
+     * but it is less demanding of scarce memory on embedded devices.
+     */
+    ctx->base.vbo_size = 16*1024;
 
     eglMakeCurrent (dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 

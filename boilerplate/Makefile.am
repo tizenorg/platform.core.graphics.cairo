@@ -21,7 +21,7 @@ cxx_boilerplate_lib =
 endif
 
 EXTRA_LTLIBRARIES += libcairoboilerplate.la $(cxx_boilerplate_lib)
-
+#lib_LTLIBRARIES = libcairoboilerplate.la $(cxx_boilerplate_lib)
 
 libcairoboilerplate_la_SOURCES = \
 	$(enabled_cairo_boilerplate_headers) \
@@ -56,6 +56,10 @@ endif
 
 if CAIRO_HAS_WIN32_SURFACE
 libcairoboilerplate_la_LIBADD += -lwinspool
+endif
+
+if CAIRO_HAS_CGL_FUNCTIONS
+libcairoboilerplate_la_LDFLAGS = -framework OpenGL
 endif
 
 cairo-boilerplate-constructors.c: Makefile $(enabled_cairo_boilerplate_sources) $(enabled_cairo_boilerplate_cxx_sources) make-cairo-boilerplate-constructors.sh

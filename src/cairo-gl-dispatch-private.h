@@ -78,6 +78,7 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(ClearStencil),
     DISPATCH_ENTRY_CORE	(ColorMask),
     DISPATCH_ENTRY_CORE	(DeleteTextures),
+    DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_CORE	(Disable),
     DISPATCH_ENTRY_CORE	(DrawArrays),
     DISPATCH_ENTRY_CORE	(DrawElements),
@@ -89,6 +90,7 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(GetFloatv),
     DISPATCH_ENTRY_CORE	(GetIntegerv),
     DISPATCH_ENTRY_CORE	(GetString),
+    DISPATCH_ENTRY_CORE	(GetStringi),
     DISPATCH_ENTRY_CORE	(PixelStorei),
     DISPATCH_ENTRY_CORE	(ReadPixels),
     DISPATCH_ENTRY_CORE	(Scissor),
@@ -102,17 +104,21 @@ cairo_private cairo_gl_dispatch_entry_t dispatch_core_entries[] = {
     DISPATCH_ENTRY_CORE	(DrawBuffer),
     DISPATCH_ENTRY_CORE	(ReadBuffer),
 #endif
-    DISPATCH_ENTRY_CORE	(DepthMask),
     DISPATCH_ENTRY_CORE	(Viewport),
     DISPATCH_ENTRY_LAST
 };
 
 cairo_private cairo_gl_dispatch_entry_t dispatch_buffers_entries[] = {
     DISPATCH_ENTRY_ARB     (GenBuffers),
+    DISPATCH_ENTRY_ARB     (DeleteBuffers),
     DISPATCH_ENTRY_ARB     (BindBuffer),
     DISPATCH_ENTRY_ARB     (BufferData),
+    DISPATCH_ENTRY_ARB     (BufferSubData),
     DISPATCH_ENTRY_ARB_OES (MapBuffer),
     DISPATCH_ENTRY_ARB_OES (UnmapBuffer),
+    DISPATCH_ENTRY_ARB     (GenVertexArrays),
+    DISPATCH_ENTRY_ARB     (DeleteVertexArrays),
+    DISPATCH_ENTRY_ARB     (BindVertexArray),
     DISPATCH_ENTRY_LAST
 };
 

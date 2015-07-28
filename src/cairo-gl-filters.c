@@ -165,14 +165,12 @@ gaussian_filter_stage_1 (cairo_bool_t x_axis,
 
     if (is_opaque)
 	_cairo_gl_shader_bind_float (ctx_out,
-				     _cairo_gl_shader_uniform_for_texunit (
-					CAIRO_GL_UNIFORM_ALPHA, CAIRO_GL_TEX_SOURCE),
-					1.0);
+				     ctx_out->current_shader->alpha_location[CAIRO_GL_TEX_SOURCE],
+			   	     1.0);
     else
 	_cairo_gl_shader_bind_float (ctx_out,
-				     _cairo_gl_shader_uniform_for_texunit (
-					CAIRO_GL_UNIFORM_ALPHA, CAIRO_GL_TEX_SOURCE),
-					0.0);
+				    ctx_out->current_shader->alpha_location[CAIRO_GL_TEX_SOURCE],
+     				    0.0);
 
     rect.x = 0;
     rect.y = 0;
@@ -212,7 +210,7 @@ gaussian_filter_stage_2 (cairo_bool_t y_axis,
 	col = original_pattern->base.x_radius * 2 + 1;
 
 	memset (&stage_2_src->operand.texture.coef[0], 0, sizeof (float) * row);
-	compute_y_coef_to_float (original_pattern->base.convolution_matrix,
+ 	compute_y_coef_to_float (original_pattern->base.convolution_matrix,
 				 row, col, &stage_2_src->operand.texture.coef[2]);
 	stage_2_src->operand.texture.y_radius = original_pattern->base.y_radius;
 	stage_2_src->operand.texture.x_radius = 1;

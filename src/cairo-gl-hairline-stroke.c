@@ -46,6 +46,8 @@ _add_cap (cairo_gl_hairline_closure_t *hairline,
           cairo_bool_t 	    lead_cap,
           cairo_point_t	    *outp)
 {
+    // Do we really need cap?
+/*
     double dx, dy;
 
     if (hairline->cap_style == CAIRO_LINE_CAP_BUTT)
@@ -57,7 +59,7 @@ _add_cap (cairo_gl_hairline_closure_t *hairline,
     cairo_matrix_transform_distance (hairline->ctm, &dx, &dy);
     outp->x += _cairo_fixed_from_double (dx);
     outp->y += _cairo_fixed_from_double (dy);
-
+*/
     return TRUE;
 }
 
@@ -121,20 +123,21 @@ _cairo_gl_hairline_style_is_hairline (const cairo_stroke_style_t *style,
     x = fabs (x - 1.0);
     y = fabs (y - 1.0);
 
+    // do not consider line join
     return style->line_width == 1.0 &&
-        (style->line_join != CAIRO_LINE_JOIN_MITER ||
-         style->miter_limit <= 10.0) &&
         (x <= SCALE_TOLERANCE && y <= SCALE_TOLERANCE);
 }
 
 static cairo_status_t
 _path_add_first_and_last_cap (cairo_gl_hairline_closure_t *hairline)
 {
+    // Do we really need caps and join for single point line?
+/*
     cairo_point_t p[2];
     cairo_status_t status = CAIRO_STATUS_SUCCESS;
     cairo_bool_t needs_to_cap;
 
-    /* check last point */
+    // check last point
     if (hairline->initialized) {
         if (! hairline->line_last_capped) {
             p[0] = hairline->line_last_point;
@@ -166,7 +169,7 @@ _path_add_first_and_last_cap (cairo_gl_hairline_closure_t *hairline)
             }
         }
     }
-
+*/
     return CAIRO_STATUS_SUCCESS;
 }
 

@@ -139,7 +139,6 @@ _cairo_default_context_push_group (void *abstract_cr, cairo_content_t content)
     cairo_surface_t *group_surface;
     cairo_clip_t *clip;
     cairo_status_t status;
-
     clip = _cairo_gstate_get_clip (cr->gstate);
     if (_cairo_clip_is_all_clipped (clip)) {
 	group_surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 0, 0);
@@ -153,6 +152,11 @@ _cairo_default_context_push_group (void *abstract_cr, cairo_content_t content)
 
 	parent_surface = _cairo_gstate_get_target (cr->gstate);
 
+	if (unlikely (parent_surface->status))
+	    return parent_surface->status;
+	if (unlikely (parent_surface->finished))
+	    return _cairo_error (CAIRO_STATUS_SURFACE_FINISHED);
+
 	/* Get the extents that we'll use in creating our new group surface */
 	bounded = _cairo_surface_get_extents (parent_surface, &extents);
 	if (clip)
@@ -165,11 +169,11 @@ _cairo_default_context_push_group (void *abstract_cr, cairo_content_t content)
 	    group_surface = cairo_recording_surface_create (content, NULL);
 	    extents.x = extents.y = 0;
 	} else {
-	    group_surface = _cairo_surface_create_similar_solid (parent_surface,
-								 content,
-								 extents.width,
-								 extents.height,
-								 CAIRO_COLOR_TRANSPARENT);
+	    group_surface = _cairo_surface_create_scratch (parent_surface,
+							   content,
+							   extents.width,
+							   extents.height,
+							   CAIRO_COLOR_TRANSPARENT);
 	}
 	status = group_surface->status;
 	if (unlikely (status))
@@ -183,6 +187,10 @@ _cairo_default_context_push_group (void *abstract_cr, cairo_content_t content)
 	cairo_surface_set_device_offset (group_surface,
 					 parent_surface->device_transform.x0 - extents.x,
 					 parent_surface->device_transform.y0 - extents.y);
+
+	cairo_surface_set_device_scale (group_surface,
+					parent_surface->device_transform.xx,
+					parent_surface->device_transform.yy);
 
 	/* If we have a current path, we need to adjust it to compensate for
 	 * the device offset just applied. */
@@ -209,7 +217,8 @@ _cairo_default_context_pop_group (void *abstract_cr)
     cairo_default_context_t *cr = abstract_cr;
     cairo_surface_t *group_surface;
     cairo_pattern_t *group_pattern;
-    cairo_matrix_t group_matrix, device_transform_matrix;
+    cairo_surface_t *parent_surface;
+    cairo_matrix_t group_matrix;
     cairo_status_t status;
 
     /* Verify that we are at the right nesting level */
@@ -223,29 +232,21 @@ _cairo_default_context_pop_group (void *abstract_cr)
     status = _cairo_gstate_restore (&cr->gstate, &cr->gstate_freelist);
     assert (status == CAIRO_STATUS_SUCCESS);
 
+    parent_surface = _cairo_gstate_get_target (cr->gstate);
+
     group_pattern = cairo_pattern_create_for_surface (group_surface);
     status = group_pattern->status;
     if (unlikely (status))
         goto done;
 
     _cairo_gstate_get_matrix (cr->gstate, &group_matrix);
-    /* Transform by group_matrix centered around device_transform so that when
-     * we call _cairo_gstate_copy_transformed_pattern the result is a pattern
-     * with a matrix equivalent to the device_transform of group_surface. */
-    if (_cairo_surface_has_device_transform (group_surface)) {
-	cairo_pattern_set_matrix (group_pattern, &group_surface->device_transform);
-	_cairo_pattern_transform (group_pattern, &group_matrix);
-	_cairo_pattern_transform (group_pattern, &group_surface->device_transform_inverse);
-    } else {
-	cairo_pattern_set_matrix (group_pattern, &group_matrix);
-    }
+    cairo_pattern_set_matrix (group_pattern, &group_matrix);
 
     /* If we have a current path, we need to adjust it to compensate for
      * the device offset just removed. */
-    cairo_matrix_multiply (&device_transform_matrix,
-                           &_cairo_gstate_get_target (cr->gstate)->device_transform,
-			   &group_surface->device_transform_inverse);
-    _cairo_path_fixed_transform (cr->path, &device_transform_matrix);
+    _cairo_path_fixed_translate (cr->path,
+				 _cairo_fixed_from_int (parent_surface->device_transform.x0 - group_surface->device_transform.x0),
+				 _cairo_fixed_from_int (parent_surface->device_transform.y0 - group_surface->device_transform.y0));
 
 done:
     cairo_surface_destroy (group_surface);
@@ -267,7 +268,7 @@ _current_source_matches_solid (const cairo_pattern_t *pattern,
 			       double red,
 			       double green,
 			       double blue,
-			       double alpha)
+			       double alpha) 
 {
     cairo_color_t color;
 
@@ -299,11 +300,8 @@ _cairo_default_context_set_source_rgba (void *abstract_cr, double red, double gr
     _cairo_default_context_set_source (cr, (cairo_pattern_t *) &_cairo_pattern_black);
 
     pattern = cairo_pattern_create_rgba (red, green, blue, alpha);
-    if (unlikely (pattern->status)) {
-        status = pattern->status;
-        cairo_pattern_destroy (pattern);
-        return pattern->status;
-    }
+    if (unlikely (pattern->status))
+	return pattern->status;
 
     status = _cairo_default_context_set_source (cr, pattern);
     cairo_pattern_destroy (pattern);
@@ -326,11 +324,8 @@ _cairo_default_context_set_source_surface (void *abstract_cr,
     _cairo_default_context_set_source (cr, (cairo_pattern_t *) &_cairo_pattern_black);
 
     pattern = cairo_pattern_create_for_surface (surface);
-    if (unlikely (pattern->status)) {
-        status = pattern->status;
-        cairo_pattern_destroy (pattern);
-        return status;
-    }
+    if (unlikely (pattern->status))
+	return pattern->status;
 
     cairo_matrix_init_translate (&matrix, -x, -y);
     cairo_pattern_set_matrix (pattern, &matrix);
@@ -711,7 +706,6 @@ _cairo_default_context_line_to (void *abstract_cr, double x, double y)
 {
     cairo_default_context_t *cr = abstract_cr;
     cairo_fixed_t x_fixed, y_fixed;
-
     _cairo_gstate_user_to_backend (cr->gstate, &x, &y);
     x_fixed = _cairo_fixed_from_double (x);
     y_fixed = _cairo_fixed_from_double (y);
@@ -729,7 +723,6 @@ _cairo_default_context_curve_to (void *abstract_cr,
     cairo_fixed_t x1_fixed, y1_fixed;
     cairo_fixed_t x2_fixed, y2_fixed;
     cairo_fixed_t x3_fixed, y3_fixed;
-
     _cairo_gstate_user_to_backend (cr->gstate, &x1, &y1);
     _cairo_gstate_user_to_backend (cr->gstate, &x2, &y2);
     _cairo_gstate_user_to_backend (cr->gstate, &x3, &y3);
@@ -758,13 +751,16 @@ _cairo_default_context_arc (void *abstract_cr,
     cairo_default_context_t *cr = abstract_cr;
     cairo_status_t status;
 
+    cairo_fixed_t x_fixed, y_fixed;
+
+    cairo_bool_t path_empty = _cairo_path_fixed_is_empty (cr->path);
+
     /* Do nothing, successfully, if radius is <= 0 */
     if (radius <= 0.0) {
-	cairo_fixed_t x_fixed, y_fixed;
-
 	_cairo_gstate_user_to_backend (cr->gstate, &xc, &yc);
 	x_fixed = _cairo_fixed_from_double (xc);
 	y_fixed = _cairo_fixed_from_double (yc);
+
 	status = _cairo_path_fixed_line_to (cr->path, x_fixed, y_fixed);
 	if (unlikely (status))
 	    return status;
@@ -787,6 +783,16 @@ _cairo_default_context_arc (void *abstract_cr,
 	_cairo_arc_path (&cr->base, xc, yc, radius, angle1, angle2);
     else
 	_cairo_arc_path_negative (&cr->base, xc, yc, radius, angle1, angle2);
+
+    if (path_empty) {
+	x_fixed = _cairo_fixed_from_double (xc + radius * cos (angle1));
+	y_fixed = _cairo_fixed_from_double (yc + radius * sin (angle1));
+	cr->path->start_point.x = x_fixed;
+	cr->path->start_point.y = y_fixed;
+	cr->path->is_convex = TRUE;
+    }
+    else
+	cr->path->is_convex = FALSE;
 
     return CAIRO_STATUS_SUCCESS; /* any error will have already been set on cr */
 }
@@ -885,6 +891,161 @@ _cairo_default_context_rectangle (void *abstract_cr,
     return _cairo_default_context_close_path (cr);
 }
 
+static cairo_status_t
+_cairo_default_context_rounded_rectangle_curve_to (void *abstract_cr,
+						   double xc, double yc, 
+						   double radius,
+						   double angle_a,
+						   double angle_b)
+{
+    double sin_a, cos_a;
+    double sin_b, cos_b;
+    double h;
+
+    sin_a = radius * sin (angle_a);
+    cos_a = radius * cos (angle_a);
+    sin_b = radius * sin (angle_b);
+    cos_b = radius * cos (angle_b);
+    h = 4.0/3.0 * tan ((angle_b - angle_a) / 4.0);
+    return _cairo_default_context_curve_to (abstract_cr,
+					    xc + cos_a - h * sin_a,
+					    yc + sin_a + h * cos_a,
+					    xc + cos_b + h * sin_b,
+					    yc + sin_b - h * cos_b,
+					    xc + cos_b, yc + sin_b);
+}
+
+static cairo_status_t
+_cairo_default_context_rounded_rectangle (void *abstract_cr,
+					  double x, double y,
+					  double width, double height,
+					  double r_top_left, double r_top_right,
+					  double r_bottom_left, double r_bottom_right)
+{
+    cairo_default_context_t *cr = abstract_cr;
+    cairo_status_t status;
+    double temp_scale, scale = 1.0;
+    double length;
+    cairo_bool_t path_empty;
+    double x_start, y_start;
+
+    if (width <= 0.0 || height <= 0.0)
+	return CAIRO_STATUS_SUCCESS;
+    
+    path_empty = _cairo_path_fixed_is_empty (cr->path);
+
+    if (r_top_left <= 0.0)
+	r_top_left = 0.0;
+    if (r_top_right <= 0.0)
+	r_top_left = 0.0;
+    if (r_bottom_left < 0.0)
+	r_bottom_left = 0.0;
+    if (r_bottom_right <= 0.0)
+	r_bottom_right = 0.0;
+
+    length = r_top_left + r_top_right;
+    if (length > width) {
+	temp_scale = width / length;
+	scale = temp_scale;
+    }
+    length = r_top_right + r_bottom_right;
+    if (length > height) {
+	temp_scale = height / length;
+	if (temp_scale < scale)
+	    scale = temp_scale;
+    }
+    length = r_bottom_right + r_bottom_left;
+    if (length > width) {
+	temp_scale = width / length;
+	if (temp_scale < scale)
+	    scale = temp_scale;
+    }
+    length = r_bottom_left + r_top_left;
+    if (length > height) {
+	temp_scale = height / length;
+	if (temp_scale < scale)
+	    scale = temp_scale;
+    }
+    
+    if (scale != 0) {
+	r_top_left *= scale;
+	r_top_right *= scale;
+	r_bottom_left *= scale;
+	r_bottom_right *= scale;
+    }
+
+    status = _cairo_default_context_move_to (cr, x, y + r_top_left);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rounded_rectangle_curve_to (cr,
+								x + r_top_left,
+								y + r_top_left,
+								r_top_left,
+								M_PI,
+								1.5 * M_PI);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rel_line_to (cr,
+						 width - r_top_left - r_top_right,
+						 0);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rounded_rectangle_curve_to (cr,
+								x + width - r_top_right,
+								y + r_top_right,
+								r_top_right,
+								1.5 *M_PI,
+								2.0 * M_PI);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rel_line_to (cr, 0, height - r_top_right - r_bottom_right);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rounded_rectangle_curve_to (cr,
+								x + width - r_bottom_right,
+								y + height - r_bottom_right,
+								r_bottom_right,
+								0,
+								0.5 * M_PI);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rel_line_to (cr, -width + r_bottom_right + r_bottom_left, 0);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_rounded_rectangle_curve_to (cr,
+								x + r_bottom_left,
+								y + height - r_bottom_left,
+								r_bottom_left,
+								0.5 * M_PI,
+								M_PI);
+    if (unlikely (status))
+	return status;
+
+    status = _cairo_default_context_close_path (cr);
+    if (unlikely (status))
+	return status;
+
+    if (path_empty) {
+	x_start = x;
+	y_start = y + r_top_left;
+	_cairo_gstate_user_to_backend (cr->gstate, &x_start, &y_start);
+	cr->path->start_point.x = _cairo_fixed_from_double (x_start);
+	cr->path->start_point.y = _cairo_fixed_from_double (y_start);
+	cr->path->is_convex = TRUE;
+    }
+    else
+	cr->path->is_convex = FALSE;
+
+    return CAIRO_STATUS_SUCCESS;
+}
+
 static void
 _cairo_default_context_path_extents (void *abstract_cr,
 				     double *x1,
@@ -950,8 +1111,12 @@ _cairo_default_context_append_path (void *abstract_cr,
 				    const cairo_path_t *path)
 {
     cairo_default_context_t *cr = abstract_cr;
+    cairo_bool_t can_apply_convex = _cairo_path_fixed_is_empty (cr->path);
 
-    return _cairo_path_append_to_context (path, &cr->base);
+    cairo_status_t status = _cairo_path_append_to_context (path, &cr->base);
+    if (can_apply_convex && path->is_convex)
+        cr->path->is_convex = path->is_convex;
+    return status;
 }
 
 static cairo_status_t
@@ -1055,7 +1220,7 @@ _cairo_default_context_fill (void *abstract_cr)
 {
     cairo_default_context_t *cr = abstract_cr;
     cairo_status_t status;
-
+    
     status = _cairo_gstate_fill (cr->gstate, cr->path);
     if (unlikely (status))
 	return status;
@@ -1297,7 +1462,6 @@ _cairo_default_context_glyphs (void *abstract_cr,
 			       cairo_glyph_text_info_t *info)
 {
     cairo_default_context_t *cr = abstract_cr;
-
     return _cairo_gstate_show_text_glyphs (cr->gstate, glyphs, num_glyphs, info);
 }
 
@@ -1307,7 +1471,6 @@ _cairo_default_context_glyph_path (void *abstract_cr,
 				   int num_glyphs)
 {
     cairo_default_context_t *cr = abstract_cr;
-
     return _cairo_gstate_glyph_path (cr->gstate,
 				     glyphs, num_glyphs,
 				     cr->path);
@@ -1320,7 +1483,6 @@ _cairo_default_context_glyph_extents (void                *abstract_cr,
 				      cairo_text_extents_t   *extents)
 {
     cairo_default_context_t *cr = abstract_cr;
-
     return _cairo_gstate_glyph_extents (cr->gstate, glyphs, num_glyphs, extents);
 }
 
@@ -1458,6 +1620,7 @@ static const cairo_backend_t _cairo_default_context_backend = {
     _cairo_default_context_close_path,
     _cairo_default_context_arc,
     _cairo_default_context_rectangle,
+    _cairo_default_context_rounded_rectangle,
     _cairo_default_context_path_extents,
     _cairo_default_context_has_current_point,
     _cairo_default_context_get_current_point,

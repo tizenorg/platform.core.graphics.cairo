@@ -4,6 +4,7 @@
  * Copyright © 2009 Chris Wilson
  * Copyright © 2005,2010 Red Hat, Inc
  * Copyright © 2011 Linaro Limited
+ * Copyright © 2011,2015 Samsung Research America, Inc - Silicon Valley
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -39,6 +40,7 @@
  *	Eric Anholt <eric@anholt.net>
  *	T. Zachary Laine <whatwasthataddress@gmail.com>
  *	Alexandros Frantzis <alexandros.frantzis@linaro.org>
+ *	Henry Song <hsong@sisa.samsung.com>
  */
 
 #ifndef CAIRO_GL_PRIVATE_H
@@ -62,11 +64,16 @@
 #include <assert.h>
 
 #if CAIRO_HAS_EVASGL_SURFACE
-#include <Evas_GL.h>
+  #include <Evas_GL.h>
 #else
   #if CAIRO_HAS_GL_SURFACE
+  #if CAIRO_HAS_CGL_FUNCTIONS
+  #include <OpenGL/gl.h>
+  #include <OpenGL/glext.h>
+  #else
   #include <GL/gl.h>
   #include <GL/glext.h>
+  #endif
   #elif CAIRO_HAS_GLESV2_SURFACE
   #include <GLES2/gl2.h>
   #include <GLES2/gl2ext.h>
@@ -75,7 +82,6 @@
   #include <GLES3/gl3ext.h>
   #endif
 #endif
-
 
 #include "cairo-gl-ext-def-private.h"
 
@@ -104,8 +110,9 @@
 
 /* VBO size that we allocate, smaller size means we gotta flush more often,
  * but larger means hogging more memory and can cause trouble for drivers
- * (especially on embedded devices). */
-#define CAIRO_GL_VBO_SIZE (16*1024)
+ * (especially on embedded devices). Use the CAIRO_GL_VBO_SIZE environment
+ * variable to set this to a different size. */
+#define CAIRO_GL_VBO_SIZE_DEFAULT (1024*1024)
 
 #define MIN_IMAGE_CACHE_WIDTH 512
 #define MIN_IMAGE_CACHE_HEIGHT 512
@@ -142,7 +149,7 @@ typedef enum cairo_gl_flavor {
     CAIRO_GL_FLAVOR_ES3 = 3
 } cairo_gl_flavor_t;
 
-/* The order here is sensitive because of the logic of
+/* The order here is sensitive because of the logic of 
  *_cairo_gl_shader_uniform_for_texunit. */
 typedef enum cairo_gl_uniform_t {
     CAIRO_GL_UNIFORM_TEXDIMS,    /* "source_texdims" */
@@ -310,7 +317,19 @@ typedef enum cairo_gl_tex {
 typedef struct cairo_gl_shader {
     GLuint fragment_shader;
     GLuint program;
-    GLint uniforms[CAIRO_GL_UNIFORM_MAX];
+    GLint mvp_location;
+    GLint constant_location[2];
+    GLint a_location[2];
+    GLint circle_d_location[2];
+    GLint radius_0_location[2];
+    GLint texdims_location[2];
+    GLint texgen_location[2];
+    GLint blur_radius_location[2];
+    GLint blurs_location[2];
+    GLint blur_step_location[2];
+    GLint blur_x_axis_location[2];
+    GLint blur_y_axis_location[2];
+    GLint alpha_location[2];
 } cairo_gl_shader_t;
 
 typedef struct _cairo_gl_image_cache {
@@ -406,7 +425,7 @@ typedef struct _cairo_gl_dispatch {
     void (*ClearStencil) (GLint s);
     void (*ColorMask) (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
     void (*DeleteTextures) (GLsizei n, const GLuint *textures);
-	void (*DepthMask)(GLboolean flag);
+    void (*DepthMask) (GLboolean flag);
     void (*Disable) (GLenum cap);
     void (*DrawArrays) (GLenum mode, GLint first, GLsizei count);
     void (*DrawElements) (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
@@ -418,6 +437,7 @@ typedef struct _cairo_gl_dispatch {
     void (*GetFloatv) (GLenum pname, GLfloat *data);
     void (*GetIntegerv) (GLenum pname, GLint *data);
     const GLubyte *(*GetString) (GLenum pname);
+    const GLubyte *(*GetStringi) (GLenum pname, GLuint i);
     void (*PixelStorei) (GLenum pname, GLint param);
     void (*ReadPixels) (GLint x, GLint y, GLsizei width, GLsizei height,
 			GLenum format, GLenum type, GLvoid *data);
@@ -442,11 +462,17 @@ typedef struct _cairo_gl_dispatch {
 
     /* Buffers */
     void (*GenBuffers) (GLsizei n, GLuint *buffers);
+    void (*DeleteBuffers) (GLsizei n, const GLuint *buffers);
     void (*BindBuffer) (GLenum target, GLuint buffer);
     void (*BufferData) (GLenum target, GLsizeiptr size,
 			  const GLvoid* data, GLenum usage);
+    void (*BufferSubData) (GLenum target, GLintptr offset,
+			   GLsizeiptr size, const GLvoid *data);
     GLvoid *(*MapBuffer) (GLenum target, GLenum access);
     GLboolean (*UnmapBuffer) (GLenum target);
+    void (*GenVertexArrays) (GLsizei n, GLuint *arrays);
+    void (*BindVertexArray) (GLuint array);
+    void (*DeleteVertexArrays) (GLsizei n, const GLuint *arrays);
 
     /* Shaders */
     GLuint (*CreateShader) (GLenum type);
@@ -540,6 +566,9 @@ typedef struct _cairo_gl_states {
     cairo_bool_t scissor_test_enabled;
     cairo_bool_t stencil_test_enabled;
 
+    GLuint bound_vbo;
+    GLuint bound_vao;
+    GLuint bound_ibo;
 } cairo_gl_states_t;
 
 struct _cairo_gl_context {
@@ -547,7 +576,6 @@ struct _cairo_gl_context {
 
     const cairo_compositor_t *compositor;
 
-    GLuint texture_load_pbo;
     GLint max_framebuffer_size;
     GLint max_texture_size;
     GLint max_textures;
@@ -556,6 +584,9 @@ struct _cairo_gl_context {
     GLint num_samples;
     cairo_bool_t supports_msaa;
     char *vb;
+    GLuint vbo;
+    GLuint vao;
+    GLuint ibo;
 
     cairo_bool_t has_shader_support;
 
@@ -565,9 +596,9 @@ struct _cairo_gl_context {
 
     cairo_cache_t gradients;
 
-	/* cache[0] for gray font, cache[1] for rgba component alpha
-	 * cache[2] for color glyph */
-	cairo_gl_glyph_cache_t glyph_cache[3];
+    /* cache[0] for gray font, cache[1] for rgba component alpha
+     * cache[2] for color glyph */
+    cairo_gl_glyph_cache_t glyph_cache[3];
     cairo_list_t fonts;
 
     cairo_gl_surface_t *current_target;
@@ -578,6 +609,7 @@ struct _cairo_gl_context {
     cairo_gl_operand_t operands[2];
     cairo_bool_t spans;
 
+    unsigned int vbo_size;
     unsigned int vb_offset;
     unsigned int vertex_size;
     cairo_region_t *clip_region;
@@ -593,6 +625,7 @@ struct _cairo_gl_context {
     cairo_bool_t has_packed_depth_stencil;
     cairo_bool_t has_npot_repeat;
     cairo_bool_t can_read_bgra;
+    cairo_bool_t is_gl33;
 
     cairo_bool_t thread_aware;
 
@@ -755,7 +788,7 @@ _cairo_gl_context_choose_emit_span (cairo_gl_context_t *ctx);
 
 cairo_private cairo_gl_emit_glyph_t
 _cairo_gl_context_choose_emit_glyph (cairo_gl_context_t *ctx,
-									const cairo_bool_t is_color_glyph);
+				     const cairo_bool_t is_color_glyph);
 
 cairo_private void
 _cairo_gl_context_activate (cairo_gl_context_t *ctx,
@@ -801,6 +834,45 @@ _enable_scissor_buffer (cairo_gl_context_t *ctx)
     if (ctx->states_cache.scissor_test_enabled == FALSE) {
         ctx->dispatch.Enable (GL_SCISSOR_TEST);
         ctx->states_cache.scissor_test_enabled = TRUE;
+    }
+}
+
+static cairo_always_inline void
+_cairo_gl_ensure_drawbuffers (cairo_gl_context_t *ctx)
+{
+    GLint vbo, ibo, vao;
+
+    if ((ctx->vao != 0 && 
+	 (ctx->vao != ctx->states_cache.bound_vao))) {
+	ctx->dispatch.GetIntegerv (GL_VERTEX_ARRAY_BINDING, &vao);
+	if (vao != ctx->states_cache.bound_vao) {
+	    ctx->dispatch.BindVertexArray (ctx->vao);
+	    ctx->states_cache.bound_vao = ctx->vao;
+
+	    ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
+	    ctx->states_cache.bound_vbo = ctx->vbo;
+
+	    ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
+	    ctx->states_cache.bound_ibo = ctx->ibo;
+	}
+    }
+
+    if ((ctx->vbo != 0 &&
+	 (ctx->vbo != ctx->states_cache.bound_vbo))) {
+	ctx->dispatch.GetIntegerv (GL_ARRAY_BUFFER_BINDING, &vbo);
+	if (vbo != (GLint) ctx->states_cache.bound_vbo) { 
+	    ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
+	}
+	ctx->states_cache.bound_vbo = ctx->vbo;
+    }
+
+    if ((ctx->ibo != 0 &&
+	 (ctx->ibo != ctx->states_cache.bound_ibo))) {
+	ctx->dispatch.GetIntegerv (GL_ELEMENT_ARRAY_BUFFER_BINDING, &ibo);
+	if (ibo != (GLint) ctx->states_cache.bound_ibo) { 
+	    ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
+	}
+	ctx->states_cache.bound_ibo = ctx->ibo;
     }
 }
 
@@ -886,6 +958,12 @@ _cairo_gl_composite_emit_triangle_as_tristrip (cairo_gl_context_t	*ctx,
 					       const cairo_point_t	 triangle[3]);
 
 cairo_private cairo_int_status_t
+_cairo_gl_composite_emit_triangle_fan (cairo_gl_context_t     *ctx,
+				       cairo_gl_composite_t   *setup,
+				       const cairo_point_t    *fan,
+                                       int                     count);
+
+cairo_private cairo_int_status_t
 _cairo_gl_composite_emit_point_as_tristrip_line (cairo_gl_context_t  *ctx,
 						 const cairo_point_t point[2],
 						 cairo_bool_t	     start_point);
@@ -944,49 +1022,49 @@ _cairo_gl_get_shader_by_type (cairo_gl_context_t *ctx,
 
 cairo_private cairo_gl_uniform_t
 _cairo_gl_shader_uniform_for_texunit (cairo_gl_uniform_t uniform,
-				      cairo_gl_tex_t tex_unit);
+                                      cairo_gl_tex_t tex_unit);
 
 cairo_private void
 _cairo_gl_shader_bind_float (cairo_gl_context_t *ctx,
-			     cairo_gl_uniform_t uniform,
+			     GLint location,
 			     float value);
 
 cairo_private void
 _cairo_gl_shader_bind_float_array (cairo_gl_context_t *ctx,
-				   cairo_gl_uniform_t uniform,
+				   GLint location,
 				   int num, float *values);
 
 cairo_private void
 _cairo_gl_shader_bind_int (cairo_gl_context_t *ctx,
-			     cairo_gl_uniform_t uniform,
+			     GLint location,
 			     int value);
 
 cairo_private void
 _cairo_gl_shader_bind_vec2 (cairo_gl_context_t *ctx,
-			    cairo_gl_uniform_t uniform,
+			    GLint location,
 			    float value0, float value1);
 
 cairo_private void
 _cairo_gl_shader_bind_vec3 (cairo_gl_context_t *ctx,
-			    cairo_gl_uniform_t uniform,
+			    GLint location,
 			    float value0,
 			    float value1,
 			    float value2);
 
 cairo_private void
 _cairo_gl_shader_bind_vec4 (cairo_gl_context_t *ctx,
-			    cairo_gl_uniform_t uniform,
+			    GLint location,
 			    float value0, float value1,
 			    float value2, float value3);
 
 cairo_private void
 _cairo_gl_shader_bind_matrix (cairo_gl_context_t *ctx,
-			      cairo_gl_uniform_t uniform,
+			      GLint location,
 			      const cairo_matrix_t* m);
 
 cairo_private void
 _cairo_gl_shader_bind_matrix4f (cairo_gl_context_t *ctx,
-				cairo_gl_uniform_t uniform,
+				GLint location,
 				GLfloat* gl_m);
 
 cairo_private void
@@ -999,8 +1077,14 @@ _cairo_gl_shader_fini (cairo_gl_context_t *ctx, cairo_gl_shader_t *shader);
 cairo_private int
 _cairo_gl_get_version (cairo_gl_dispatch_t *dispatch);
 
+cairo_private int
+_cairo_glsl_get_version (cairo_gl_dispatch_t *dispatch);
+
 cairo_private cairo_gl_flavor_t
 _cairo_gl_get_flavor (cairo_gl_dispatch_t *dispatch);
+
+cairo_private unsigned long
+_cairo_gl_get_vbo_size (void);
 
 cairo_private cairo_bool_t
 _cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext);

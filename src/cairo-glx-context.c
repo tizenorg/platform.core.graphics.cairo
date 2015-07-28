@@ -55,6 +55,7 @@ typedef struct _cairo_glx_context {
     GLXDrawable current_drawable;
 
     GLXContext previous_context;
+    GLXDrawable previous_drawable;
 
     cairo_bool_t has_multithread_makecurrent;
 } cairo_glx_context_t;
@@ -68,7 +69,8 @@ typedef struct _cairo_glx_surface {
 static cairo_bool_t
 _context_acquisition_changed_glx_state (cairo_glx_context_t *ctx)
 {
-    return ctx->previous_context != ctx->context;
+    return ctx->previous_context != ctx->context ||
+           ctx->previous_drawable != ctx->current_drawable;
 }
 
 static GLXDrawable
@@ -86,6 +88,7 @@ static void *
 _glx_query_current_state (cairo_glx_context_t * ctx)
 {
     ctx->previous_context = glXGetCurrentContext ();
+    ctx->previous_drawable = glXGetCurrentDrawable ();
 }
 
 static void
@@ -252,7 +255,7 @@ _cairo_glx_get_proc_address (void *data, const char *name)
 	    return func_map[i].func;
     }
 
-  return glXGetProcAddress (name);
+    return glXGetProcAddress (name);
 }
 
 cairo_device_t *

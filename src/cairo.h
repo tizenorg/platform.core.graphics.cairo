@@ -290,6 +290,8 @@ typedef struct _cairo_user_data_key {
  *   cairo_mesh_pattern_begin_patch()/cairo_mesh_pattern_end_patch()
  *   pair (Since 1.12)
  * @CAIRO_STATUS_DEVICE_FINISHED: target device has been finished (Since 1.12)
+ * @CAIRO_STATUS_JBIG2_GLOBAL_MISSING: %CAIRO_MIME_TYPE_JBIG2_GLOBAL_ID has been used on at least one image
+ *   but no image provided %CAIRO_MIME_TYPE_JBIG2_GLOBAL (Since 1.14)
  * @CAIRO_STATUS_LAST_STATUS: this is a special value indicating the number of
  *   status values defined in this enumeration.  When using this value, note
  *   that the version of cairo at run-time may have additional status values
@@ -345,6 +347,7 @@ typedef enum _cairo_status {
     CAIRO_STATUS_DEVICE_ERROR,
     CAIRO_STATUS_INVALID_MESH_CONSTRUCTION,
     CAIRO_STATUS_DEVICE_FINISHED,
+    CAIRO_STATUS_JBIG2_GLOBAL_MISSING,
 
     CAIRO_STATUS_LAST_STATUS
 } cairo_status_t;
@@ -892,6 +895,13 @@ cairo_rectangle (cairo_t *cr,
 		 double x, double y,
 		 double width, double height);
 
+cairo_public void
+cairo_rounded_rectangle (cairo_t *cr,
+			 double x, double y,
+			 double width, double height,
+			 double r_top_left,    double r_top_right,
+			 double r_bottom_left, double r_bottom_right);
+
 /* XXX: NYI
 cairo_public void
 cairo_stroke_to_path (cairo_t *cr);
@@ -1341,7 +1351,7 @@ typedef enum _cairo_hint_metrics {
 /**
  * cairo_font_color_t:
  * @CAIRO_FONT_COLOR_DEFAULT: default color, if the font has color,
- *	use font's color, otherwise, use user specified, since 1.12.14
+ *  use font's color, otherwise, use user specified, since 1.12.14
  * @CAIRO_FONT_COLOR_USER: always uses user's color, since 1.0
  *
  * When rendering text, specifies whether to use user's color set
@@ -1349,12 +1359,12 @@ typedef enum _cairo_hint_metrics {
  *
  * Since: 1.4
  **/
- typedef enum _cairo_font_color {
-	CAIRO_FONT_COLOR_DEFAULT,
-	CAIRO_FONT_COLOR_USER
- } cairo_font_color_t;
+typedef enum _cairo_font_color {
+    CAIRO_FONT_COLOR_DEFAULT,
+    CAIRO_FONT_COLOR_USER
+} cairo_font_color_t;
 
- /**
+/**
  * cairo_font_options_t:
  *
  * An opaque structure holding all options that are used when
@@ -1426,8 +1436,7 @@ cairo_font_options_get_hint_metrics (const cairo_font_options_t *options);
 
 cairo_public void
 cairo_font_options_set_font_color (cairo_font_options_t *options,
-cairo_font_color_t  font_color);
-
+				   cairo_font_color_t  font_color);
 cairo_public cairo_font_color_t
 cairo_font_options_get_font_color (const cairo_font_options_t *options);
 
@@ -2095,6 +2104,7 @@ typedef struct cairo_path {
     cairo_status_t status;
     cairo_path_data_t *data;
     int num_data;
+    unsigned int is_convex         : 1;
 } cairo_path_t;
 
 cairo_public cairo_path_t *
@@ -2231,6 +2241,15 @@ cairo_surface_create_for_rectangle (cairo_surface_t	*target,
                                     double		 width,
                                     double		 height);
 
+/**
+ * cairo_surface_observer_mode_t:
+ * @CAIRO_SURFACE_OBSERVER_NORMAL: no recording is done
+ * @CAIRO_SURFACE_OBSERVER_RECORD_OPERATIONS: operations are recorded
+ *
+ * Whether operations should be recorded.
+ *
+ * Since: 1.12
+ **/
 typedef enum {
 	CAIRO_SURFACE_OBSERVER_NORMAL = 0,
 	CAIRO_SURFACE_OBSERVER_RECORD_OPERATIONS = 0x1
@@ -2405,8 +2424,7 @@ typedef enum _cairo_surface_type {
     CAIRO_SURFACE_TYPE_XML,
     CAIRO_SURFACE_TYPE_SKIA,
     CAIRO_SURFACE_TYPE_SUBSURFACE,
-    CAIRO_SURFACE_TYPE_COGL,
-    CAIRO_SURFACE_TYPE_TG,
+    CAIRO_SURFACE_TYPE_COGL
 } cairo_surface_type_t;
 
 cairo_public cairo_surface_type_t
@@ -2443,6 +2461,9 @@ cairo_surface_set_user_data (cairo_surface_t		 *surface,
 #define CAIRO_MIME_TYPE_JP2 "image/jp2"
 #define CAIRO_MIME_TYPE_URI "text/x-uri"
 #define CAIRO_MIME_TYPE_UNIQUE_ID "application/x-cairo.uuid"
+#define CAIRO_MIME_TYPE_JBIG2 "application/x-cairo.jbig2"
+#define CAIRO_MIME_TYPE_JBIG2_GLOBAL "application/x-cairo.jbig2-global"
+#define CAIRO_MIME_TYPE_JBIG2_GLOBAL_ID "application/x-cairo.jbig2-global-id"
 
 cairo_public void
 cairo_surface_get_mime_data (cairo_surface_t		*surface,
@@ -2478,6 +2499,16 @@ cairo_surface_mark_dirty_rectangle (cairo_surface_t *surface,
 				    int              y,
 				    int              width,
 				    int              height);
+
+cairo_public void
+cairo_surface_set_device_scale (cairo_surface_t *surface,
+				double           x_scale,
+				double           y_scale);
+
+cairo_public void
+cairo_surface_get_device_scale (cairo_surface_t *surface,
+				double          *x_scale,
+				double          *y_scale);
 
 cairo_public void
 cairo_surface_set_device_offset (cairo_surface_t *surface,
@@ -2961,10 +2992,10 @@ cairo_public void
 cairo_set_shadow_rgba (cairo_t *cr, double red, double green,
 		       double blue, double alpha);
 
-cairo_public void
+cairo_public void 
 cairo_set_shadow_blur (cairo_t *cr, double x_blur, double y_blur);
 
-cairo_public void
+cairo_public void 
 cairo_set_draw_shadow_only (cairo_t *cr, cairo_bool_t draw_shadow_only);
 
 cairo_public void
@@ -3090,6 +3121,17 @@ cairo_matrix_transform_point (const cairo_matrix_t *matrix,
  **/
 typedef struct _cairo_region cairo_region_t;
 
+/**
+ * cairo_region_overlap_t:
+ * @CAIRO_REGION_OVERLAP_IN: The contents are entirely inside the region. (Since 1.10)
+ * @CAIRO_REGION_OVERLAP_OUT: The contents are entirely outside the region. (Since 1.10)
+ * @CAIRO_REGION_OVERLAP_PART: The contents are partially inside and
+ *     partially outside the region. (Since 1.10)
+ *
+ * Used as the return value for cairo_region_contains_rectangle().
+ *
+ * Since: 1.10
+ **/
 typedef enum _cairo_region_overlap {
     CAIRO_REGION_OVERLAP_IN,		/* completely inside region */
     CAIRO_REGION_OVERLAP_OUT,		/* completely outside region */

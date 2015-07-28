@@ -257,9 +257,6 @@ _cairo_quartz_surface_create_internal (CGContextRef cgContext,
 				       unsigned int width,
 				       unsigned int height);
 
-static cairo_bool_t
-_cairo_surface_is_quartz (const cairo_surface_t *surface);
-
 /* Load all extra symbols */
 static void quartz_ensure_symbols (void)
 {
@@ -1521,7 +1518,6 @@ _cairo_quartz_teardown_state (cairo_quartz_drawing_state_t *state,
 	CGContextDrawLayerInRect (surface->cgContext,
 				  state->clipRect,
 				  state->layer);
-	CGContextRelease (state->cgDrawContext);
 	CGLayerRelease (state->layer);
     }
 
@@ -1805,7 +1801,7 @@ _cairo_quartz_cg_mask_with_surface (cairo_composite_rectangles_t *extents,
     cairo_matrix_t m = *mask_mat;
 
     _cairo_surface_get_extents (extents->surface, &dest_extents);
-    status = _cairo_surface_to_cgimage (&extents->mask_pattern.base,
+    status = _cairo_surface_to_cgimage (&extents->mask_pattern.base, 
 					mask_surf, &dest_extents, format,
 					&m, extents->clip, &img);
     if (unlikely (status))
@@ -2791,7 +2787,15 @@ cairo_quartz_surface_get_cg_context (cairo_surface_t *surface)
 	return NULL;
 }
 
-static cairo_bool_t
+/**
+ * _cairo_surface_is_quartz:
+ * @surface: a #cairo_surface_t
+ *
+ * Checks if a surface is a #cairo_quartz_surface_t
+ *
+ * Return value: True if the surface is an quartz surface
+ **/
+cairo_bool_t
 _cairo_surface_is_quartz (const cairo_surface_t *surface)
 {
     return surface->backend == &cairo_quartz_surface_backend;

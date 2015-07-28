@@ -152,7 +152,9 @@ static const cairo_t _cairo_nil[] = {
     DEFINE_NIL_CONTEXT (CAIRO_STATUS_DEVICE_TYPE_MISMATCH),
     DEFINE_NIL_CONTEXT (CAIRO_STATUS_DEVICE_ERROR),
     DEFINE_NIL_CONTEXT (CAIRO_STATUS_INVALID_MESH_CONSTRUCTION),
-    DEFINE_NIL_CONTEXT (CAIRO_STATUS_DEVICE_FINISHED)
+    DEFINE_NIL_CONTEXT (CAIRO_STATUS_DEVICE_FINISHED),
+    DEFINE_NIL_CONTEXT (CAIRO_STATUS_JBIG2_GLOBAL_MISSING)
+
 };
 COMPILE_TIME_ASSERT (ARRAY_LENGTH (_cairo_nil) == CAIRO_STATUS_LAST_STATUS - 1);
 
@@ -228,6 +230,8 @@ cairo_create (cairo_surface_t *target)
 	return _cairo_create_in_error (_cairo_error (CAIRO_STATUS_NULL_POINTER));
     if (unlikely (target->status))
 	return _cairo_create_in_error (target->status);
+    if (unlikely (target->finished))
+	return _cairo_create_in_error (_cairo_error (CAIRO_STATUS_SURFACE_FINISHED));
 
     if (target->backend->create_context == NULL)
 	return _cairo_create_in_error (_cairo_error (CAIRO_STATUS_WRITE_ERROR));
@@ -1635,7 +1639,6 @@ cairo_arc (cairo_t *cr,
 	    angle2 += 2 * M_PI;
 	angle2 += angle1;
     }
-
     status = cr->backend->arc (cr, xc, yc, radius, angle1, angle2, TRUE);
     if (unlikely (status))
 	_cairo_set_error (cr, status);
@@ -1864,6 +1867,53 @@ cairo_rectangle (cairo_t *cr,
 	return;
 
     status = cr->backend->rectangle (cr, x, y, width, height);
+    if (unlikely (status))
+	_cairo_set_error (cr, status);
+}
+
+/**
+ * cairo_rounded_rectangle:
+ * @cr: a cairo context
+ * @x: the X coordinate of the top left corner of the rectangle
+ * @y: the Y coordinate to the top left corner of the rectangle
+ * @width: the width of the rectangle
+ * @height: the height of the rectangle
+ * @r_top_left: top left corner radius
+ * @r_top_right: top right corner radius
+ * @r_bottom_left: bottom left corner radius
+ * @r_bottom_left: top left corner radius
+ *
+ * Adds a closed sub-path roundedrectangle of the given size to the current
+ * path at position (@x, @y) in user-space coordinates.
+ *
+ * This function is logically equivalent to:
+ * <informalexample><programlisting>
+ * cairo_move_to (cr, x, y + r_top_left)
+ * cairo_rel_curve_to (cr, ....)
+ * cairo_rel_line_to (cr, ....)
+ * cairo_rel_curve_to (cr, ....)
+ * cairo_line_to (cr, ....)
+ * cairo_rel_curve_to (cr, ....)
+ * cairo_close_path (cr)
+ * </programlisting></informalexample>
+ *
+ * Since: 1.12
+ **/
+void
+cairo_rounded_rectangle (cairo_t *cr,
+			 double x, double y,
+			 double width, double height,
+			 double r_top_left, double r_top_right,
+			 double r_bottom_left, double r_bottom_right)
+{
+    cairo_status_t status;
+
+    if (unlikely (cr->status))
+	return;
+
+    status = cr->backend->rounded_rectangle (cr, x, y, width, height,
+					     r_top_left, r_top_right,
+					     r_bottom_left, r_bottom_right);
     if (unlikely (status))
 	_cairo_set_error (cr, status);
 }

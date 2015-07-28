@@ -259,6 +259,10 @@ cairo_private void
 _cairo_pattern_transform (cairo_pattern_t      *pattern,
 			  const cairo_matrix_t *ctm_inverse);
 
+cairo_private void
+_cairo_pattern_pretransform (cairo_pattern_t      *pattern,
+                             const cairo_matrix_t *ctm);
+
 cairo_private cairo_bool_t
 _cairo_pattern_is_opaque_solid (const cairo_pattern_t *pattern);
 
@@ -307,7 +311,7 @@ _cairo_mesh_pattern_coord_box (const cairo_mesh_pattern_t *mesh,
 			       double                     *out_xmax,
 			       double                     *out_ymax);
 
-cairo_private_no_warn cairo_filter_t
+cairo_private void
 _cairo_pattern_sampled_area (const cairo_pattern_t *pattern,
 			     const cairo_rectangle_int_t *extents,
 			     cairo_rectangle_int_t *sample);
@@ -350,6 +354,9 @@ cairo_private cairo_bool_t
 _cairo_pattern_equal (const cairo_pattern_t *a,
 		      const cairo_pattern_t *b);
 
+cairo_private cairo_filter_t
+_cairo_pattern_analyze_filter (const cairo_pattern_t *pattern);
+
 /* cairo-mesh-pattern-rasterizer.c */
 
 cairo_private void
@@ -380,7 +387,7 @@ _cairo_raster_source_pattern_init_copy (cairo_pattern_t *pattern,
 cairo_private void
 _cairo_raster_source_pattern_finish (cairo_pattern_t *abstract_pattern);
 
-cairo_private cairo_status_t
+cairo_private cairo_status_t 
 _cairo_pattern_create_gaussian_matrix (cairo_pattern_t *pattern,
 				       double		line_width);
 

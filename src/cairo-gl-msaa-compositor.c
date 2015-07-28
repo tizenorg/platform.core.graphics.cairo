@@ -47,6 +47,7 @@
 #include "cairo-gl-private.h"
 #include "cairo-path-private.h"
 #include "cairo-traps-private.h"
+#include "cairo-convex-fill-private.h"
 
 static cairo_bool_t
 can_use_msaa_compositor (cairo_gl_surface_t *surface,
@@ -151,8 +152,8 @@ _draw_traps (cairo_gl_context_t		*ctx,
 
 static cairo_int_status_t
 _draw_int_rect (cairo_gl_context_t	*ctx,
-		cairo_gl_composite_t	*setup,
-		cairo_rectangle_int_t	*rect)
+		      cairo_gl_composite_t	*setup,
+		      cairo_rectangle_int_t	*rect)
 {
     int quad[8];
 
@@ -536,10 +537,12 @@ _cairo_gl_msaa_compositor_mask_source_operator (const cairo_compositor_t *compos
 	status = _draw_int_rect (ctx, &setup, &composite->bounded);
     else
 	status = _draw_traps (ctx, &setup, &traps);
+    if (unlikely (status))
+        goto finish;
 
     /* Now draw the second pass. */
     status = _cairo_gl_composite_set_operator (&setup, CAIRO_OPERATOR_ADD,
-				      FALSE /* assume_component_alpha */);
+					       FALSE /* assume_component_alpha */);
     if (unlikely (status))
         goto finish;
     status = _cairo_gl_composite_set_source (&setup,
@@ -716,7 +719,7 @@ _cairo_gl_msaa_compositor_mask (const cairo_compositor_t	*compositor,
 
 	if (clip) {
 	    cairo_clip_t *clip_copy = _cairo_clip_copy (clip);
-
+	
 	    clip_copy = _cairo_clip_intersect_rectangle (clip_copy, &rect);
 	    status = _cairo_gl_msaa_compositor_draw_clip (ctx, &setup,
 							  clip_copy);
@@ -766,6 +769,59 @@ _stroke_shaper_add_triangle_fan (void			*closure,
     struct _tristrip_composite_info *info = closure;
     return _draw_triangle_fan (info->ctx, &info->setup,
 			       midpoint, points, npoints);
+}
+
+static cairo_status_t
+_fill_add_triangle_fan (void 		    *closure,
+			const cairo_point_t *points,
+			int		     npoints)
+{
+    cairo_status_t status = CAIRO_STATUS_SUCCESS;
+    int n = npoints - 1, idx = 1;
+    cairo_bool_t done = FALSE;
+    struct _tristrip_composite_info *info = closure;
+    cairo_point_t triangle[3], quad[4];
+    cairo_point_t midp = points[0];
+
+    if (n <= 1)
+	return status;
+    else if (n <= 2) {
+	triangle[0] = midp;
+	triangle[1] = points[idx];
+	triangle[2] = points[++idx];
+	return _cairo_gl_composite_emit_triangle_as_tristrip (info->ctx, &info->setup, triangle);
+    }
+    else {
+	quad[0] = midp;
+	quad[1] = points[idx];
+	quad[2] = points[++idx];
+	quad[3] = points[++idx];
+	n -= 3;
+	status = _cairo_gl_composite_emit_quad_as_tristrip (info->ctx, &info->setup, quad);
+    }
+
+    while (! done) {
+	if (n == 0)
+	    break;
+	if (n == 1) {
+	    triangle[0] = midp;
+	    triangle[1] = points[idx];
+	    triangle[2] = points[++idx];
+	    status = _cairo_gl_composite_emit_triangle_as_tristrip (info->ctx, &info->setup, triangle);
+	    break;
+ 	}
+	else {
+	    quad[0] = midp;
+	    quad[1] = points[idx];
+	    quad[2] = points[++idx];
+	    quad[3] = points[++idx];
+	    n -= 2;
+	    status = _cairo_gl_composite_emit_quad_as_tristrip (info->ctx, &info->setup, quad);
+	    if (unlikely (status))
+		break;
+	}
+    }
+    return status;
 }
 
 static cairo_status_t
@@ -918,9 +974,9 @@ _cairo_gl_msaa_compositor_stroke (const cairo_compositor_t	*compositor,
 
 	if (stroke_extents.width != 0 &&
 	    stroke_extents.height != 0) {
-	    if ((stroke_extents.width / stroke_extents.height > 10  &&
+	    if ((stroke_extents.width / stroke_extents.height > 10  && 
 		 stroke_extents.height < 10) ||
-		(stroke_extents.height / stroke_extents.width > 10 &&
+		(stroke_extents.height / stroke_extents.width > 10 && 
 		 stroke_extents.width < 10)) {
 		return CAIRO_INT_STATUS_UNSUPPORTED;
 	    }
@@ -981,14 +1037,23 @@ _cairo_gl_msaa_compositor_stroke (const cairo_compositor_t	*compositor,
     if (_cairo_gl_hairline_style_is_hairline (style, ctm)) {
 	cairo_gl_hairline_closure_t closure;
 
+        /* prevent overlapping is very expensive, we should avoid it
+           at all cost.  In case of hairline, the overlapping occurs
+           on a single pixel and is almost indistinguishable.  To
+           trade-off quality vs performance, for hairline, we disable
+           overlapping
+	*/
+        /*
 	if (! (_is_continuous_arc (path, style) ||
-	       _is_continuous_single_line (path, style))) {
+	       _is_continuous_single_line (path, style) ||
+               path->is_convex)) {
 	    status = _prevent_overlapping_strokes (info.ctx, &info.setup,
 						   composite, path,
 						   style, ctm);
 	    if (unlikely (status))
 		goto finish;
 	}
+        */
 
 	closure.ctx = info.ctx;
 
@@ -1045,7 +1110,6 @@ _draw_simple_quad_path (cairo_gl_context_t *ctx,
     cairo_point_t triangle[3];
     cairo_int_status_t status;
     const cairo_point_t *points;
-
     points = cairo_path_head (path)->points;
 
     triangle[0] = points[0];
@@ -1076,6 +1140,7 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
     cairo_traps_t traps;
     cairo_bool_t draw_path_with_traps;
     cairo_rectangle_int_t fill_extents;
+    struct _tristrip_composite_info info;
 
     if (! can_use_msaa_compositor (dst, antialias))
 	return CAIRO_INT_STATUS_UNSUPPORTED;
@@ -1084,9 +1149,9 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
 	_cairo_path_fixed_approximate_fill_extents (path, &fill_extents);
 
 	if (fill_extents.width != 0 && fill_extents.height != 0) {
-	    if ((fill_extents.width / fill_extents.height > 10  &&
+	    if ((fill_extents.width / fill_extents.height > 10  && 
 		 fill_extents.height < 10) ||
-		(fill_extents.height / fill_extents.width > 10 &&
+		(fill_extents.height / fill_extents.width > 10 && 
 		 fill_extents.width < 10)) {
 		return CAIRO_INT_STATUS_UNSUPPORTED;
 	    }
@@ -1122,13 +1187,6 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
 
     draw_path_with_traps = ! _cairo_path_fixed_is_simple_quad (path);
 
-    if (draw_path_with_traps) {
-	_cairo_traps_init (&traps);
-	status = _cairo_path_fixed_fill_to_traps (path, fill_rule, tolerance, &traps);
-	if (unlikely (status))
-	    goto cleanup_traps;
-    }
-
     status = _cairo_gl_composite_init (&setup,
 				       composite->op,
 				       dst,
@@ -1147,15 +1205,44 @@ _cairo_gl_msaa_compositor_fill (const cairo_compositor_t	*compositor,
     _cairo_gl_msaa_compositor_set_clip (composite, &setup);
     if (antialias != CAIRO_ANTIALIAS_NONE)
 	_cairo_gl_composite_set_multisample (&setup);
-
+    
     status = _cairo_gl_composite_begin (&setup, &ctx);
     if (unlikely (status))
 	goto cleanup_setup;
 
-    if (! draw_path_with_traps)
+    if(path->is_convex) {
+
+	cairo_convex_fill_closure_t filler;
+	filler.tolerance = tolerance;
+	info.ctx = ctx;
+	info.setup = setup;
+	filler.closure = &info;
+	filler.midp_added = FALSE;
+  	status = _cairo_path_fixed_fill_to_convex((*_fill_add_triangle_fan),
+						   path,
+						   _cairo_convex_fill_move_to,
+						   _cairo_convex_fill_line_to,
+						   _cairo_convex_fill_curve_to,
+						   _cairo_convex_fill_close_path,
+ 						   &filler);
+        if (unlikely (status))
+	    goto cleanup_setup;
+
+    }
+    else if (draw_path_with_traps) {
+	_cairo_traps_init (&traps);
+	status = _cairo_path_fixed_fill_to_traps (path, fill_rule, tolerance, &traps);
+        if (unlikely (status))
+	    goto cleanup_traps;
+    }
+
+    if (!path->is_convex && ! draw_path_with_traps)
 	status = _draw_simple_quad_path (ctx, &setup, path);
     else
-	status = _draw_traps (ctx, &setup, &traps);
+    {
+        if(!path->is_convex)
+            status = _draw_traps (ctx, &setup, &traps);
+    }
     if (unlikely (status))
         goto cleanup_setup;
 
@@ -1168,7 +1255,7 @@ cleanup_setup:
 	status = _cairo_gl_context_release (ctx, status);
 
 cleanup_traps:
-    if (draw_path_with_traps)
+    if (draw_path_with_traps && !path->is_convex)
 	_cairo_traps_fini (&traps);
 
     return status;
@@ -1215,7 +1302,13 @@ _cairo_gl_msaa_compositor_glyphs (const cairo_compositor_t	*compositor,
 
 	return _paint_back_unbounded_surface (compositor, composite, surface);
     }
-
+/*
+    if (scaled_font->options.antialias != CAIRO_ANTIALIAS_NONE) {
+	status = _blit_texture_to_renderbuffer (dst);
+	if (unlikely (status))
+	    return status;
+    }
+*/
     src = _cairo_gl_pattern_to_source (&dst->base,
 				       composite->original_source_pattern,
 				       FALSE,
@@ -1253,6 +1346,7 @@ _cairo_gl_msaa_compositor_glyphs (const cairo_compositor_t	*compositor,
     dst->content_synced = FALSE;
 
 finish:
+    if (src)
 	cairo_surface_destroy (src);
 
     return status;
@@ -1264,7 +1358,6 @@ _cairo_gl_msaa_compositor_init (cairo_compositor_t	 *compositor,
 {
     compositor->delegate = delegate;
     compositor->lazy_init = TRUE;
-
     compositor->paint = _cairo_gl_msaa_compositor_paint;
     compositor->mask = _cairo_gl_msaa_compositor_mask;
     compositor->fill = _cairo_gl_msaa_compositor_fill;
