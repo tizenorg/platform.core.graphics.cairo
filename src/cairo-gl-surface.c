@@ -769,10 +769,7 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
     default:
 	ASSERT_NOT_REACHED;
     case CAIRO_CONTENT_COLOR_ALPHA:
-	if(ctx->can_read_bgra)
-	    format = GL_BGRA;
-	else
-	    format = GL_RGBA;
+	format = GL_RGBA;
 	break;
     case CAIRO_CONTENT_ALPHA:
 	/* When using GL_ALPHA, compositing doesn't work properly, but for
@@ -792,10 +789,7 @@ _create_scratch_internal (cairo_gl_context_t *ctx,
 	 * specified.  So, we have to store RGBA, and fill the alpha
 	 * channel with 1 when blending.
 	 */
-	if(ctx->can_read_bgra)
-	    format = GL_BGRA;
-	else
-	    format = GL_RGBA;
+	format = GL_RGBA;
 	break;
     }
 
@@ -1228,10 +1222,8 @@ _cairo_gl_surface_draw_image (cairo_gl_surface_t *dst,
 	pixman_format = _cairo_is_little_endian () ? PIXMAN_a8b8g8r8 : PIXMAN_r8g8b8a8;
 
 	if (src->base.content != CAIRO_CONTENT_ALPHA) {
-	    if (src->pixman_format != pixman_format) {
-		if (!ctx->can_read_bgra)
+	    if (src->pixman_format != pixman_format)
 		    require_conversion = TRUE;
-	    }
 	}
 	else if (dst->base.content != CAIRO_CONTENT_ALPHA)
 	    require_conversion = TRUE;

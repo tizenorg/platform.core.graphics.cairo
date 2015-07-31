@@ -257,6 +257,10 @@ test_can_read_bgra (cairo_gl_context_t *ctx, cairo_gl_flavor_t gl_flavor)
 
     assert (gl_flavor == CAIRO_GL_FLAVOR_ES2 ||
 	    gl_flavor == CAIRO_GL_FLAVOR_ES3);
+    /* FIXME: always return false for GLES,  this is tizen TV driver problem.
+       Once that is resolved, we will return properly */
+
+    return FALSE;
 
    /* For OpenGL ES we have to look for the specific extension and BGRA only
     * matches cairo's integer packed bytes on little-endian machines. */
