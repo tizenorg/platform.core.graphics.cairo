@@ -9,7 +9,7 @@ Name:           cairo
 #Version:        1.12.16
 Version:        1.14.2
 Release:        0
-License:        LGPL-2.1+ or MPL-1.1
+License:        MPL-1.1 or LGPL-2.1+
 Summary:        Vector Graphics Library with Cross-Device Output Support
 Url:            http://cairographics.org/
 Group:          Graphics/Libraries
@@ -112,7 +112,7 @@ hardware acceleration when available.
 This package contains various cairo utilities.
 
 %package devel
-License:        LGPL-2.1+ or MPL-1.1
+License:        MPL-1.1 or LGPL-2.1+
 Summary:        Development environment for cairo
 Group:          Development/Libraries
 Requires:       libcairo = %{version}
