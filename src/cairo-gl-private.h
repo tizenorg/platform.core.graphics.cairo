@@ -165,6 +165,10 @@ typedef enum cairo_gl_uniform_t {
     CAIRO_GL_UNIFORM_BLUR_X_AXIS, /* "source_blur_x_axis" */
     CAIRO_GL_UNIFORM_BLUR_Y_AXIS, /* "source_blur_y_axis" */
     CAIRO_GL_UNIFORM_ALPHA,	  /* "source_alpha */
+    CAIRO_GL_UNIFORM_COLOR_1,	  /* "source_color_1 */
+    CAIRO_GL_UNIFORM_COLOR_2,	  /* "source_color_2 */
+    CAIRO_GL_UNIFORM_OFFSET_1,	  /* "source_offset_1 */
+    CAIRO_GL_UNIFORM_OFFSET_2,	  /* "source_offset_2 */
 
     CAIRO_GL_UNIFORM_MASK_TEXDIMS,      /* "mask_texdims" */
     CAIRO_GL_UNIFORM_MASK_TEXGEN,       /* "mask_texgen" */
@@ -179,6 +183,10 @@ typedef enum cairo_gl_uniform_t {
     CAIRO_GL_UNIFORM_MASK_BLUR_X_AXIS,   /* "mask_blur_x_axis" */
     CAIRO_GL_UNIFORM_MASK_BLUR_Y_AXIS,   /* "mask_blur_y_axis" */
     CAIRO_GL_UNIFORM_MASK_ALPHA,	 /* "mask_alpha" */
+    CAIRO_GL_UNIFORM_MASK_COLOR_1,	  /* "mask_color_1" */
+    CAIRO_GL_UNIFORM_MASK_COLOR_2,	  /* "mask_color_2" */
+    CAIRO_GL_UNIFORM_MASK_OFFSET_1,	  /* "mask_offset_1 */
+    CAIRO_GL_UNIFORM_MASK_OFFSET_2,	  /* "mask_offset_2 */
 
     CAIRO_GL_UNIFORM_PROJECTION_MATRIX, /* "ModelViewProjectionMatrix" */
 
@@ -330,6 +338,10 @@ typedef struct cairo_gl_shader {
     GLint blur_x_axis_location[2];
     GLint blur_y_axis_location[2];
     GLint alpha_location[2];
+    GLint color_1_location[2];
+    GLint color_2_location[2];
+    GLint offset_1_location[2];
+    GLint offset_2_location[2];
 } cairo_gl_shader_t;
 
 typedef struct _cairo_gl_image_cache {

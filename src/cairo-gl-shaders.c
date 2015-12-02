@@ -551,7 +551,6 @@ cairo_gl_shader_get_vertex_source (cairo_gl_var_type_t src,
     status = _cairo_memory_stream_destroy (stream, &source, &length);
     if (unlikely (status))
 	return status;
-
     *out = (char *) source;
     return CAIRO_STATUS_SUCCESS;
 }
@@ -791,6 +790,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	}
 	break;
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0:
+	if (op->gradient.gradient->n_stops != 2) {
 	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
 	    _cairo_output_stream_printf (stream,
 		"in vec2 %s_texcoords;\n"
@@ -850,8 +850,116 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"}\n",
 		textstr, rectstr, namestr, namestr);
 	}
+	} else { // else of if (op->gradient.gradient->n_stops != 2)
+	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
+	    _cairo_output_stream_printf (stream,
+		"in vec2 %s_texcoords;\n"
+		"uniform vec2 %s_texdims;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float t = 0.5 * C / B;\n"
+		"    float is_valid = step (-%s_radius_0, t * %s_circle_d.z);\n",
+		namestr, namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr);
+	} else {
+	    _cairo_output_stream_printf (stream,
+		"varying vec2 %s_texcoords;\n"
+		"uniform vec2 %s_texdims;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float t = 0.5 * C / B;\n"
+		"    float is_valid = step (-%s_radius_0, t * %s_circle_d.z);\n",
+		namestr, namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr);
+	}
+
+	if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
+	     ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
+	    _cairo_gl_shader_needs_border_fade (op))
+	{
+	    _cairo_output_stream_printf (stream,
+		"    float border_fade = %s_border_fade (t, %s_texdims.x);\n"
+		//"    vec4 texel = texture%s%s (%s_sampler, vec2 (t, 0.5));\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    if (t <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (t >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (t - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel * border_fade, is_valid);\n"
+		"}\n",
+		namestr, namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr);
+	}
+	else
+	{
+	    _cairo_output_stream_printf (stream,
+		//"    vec4 texel = texture%s%s (%s_sampler, %s_wrap (vec2 (t, 0.5)));\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    float upper_t = (vec2(%s_wrap (vec2 (t, 0.5)))).x;\n"
+		"    if (upper_t <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (upper_t >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (upper_t - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel, is_valid);\n"
+		"}\n",
+		namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr);
+	}
+
+	} //end of if (op->gradient.gradient->n_stops != 2) 
 	break;
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE:
+	if (op->gradient.gradient->n_stops != 2) {
 	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
 	    _cairo_output_stream_printf (stream,
 		"in vec2 %s_texcoords;\n"
@@ -925,8 +1033,130 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"}\n",
 		textstr, rectstr, namestr, namestr);
 	}
+	} else {  //else of if (op->gradient.gradient->n_stops != 2) 
+	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
+	    _cairo_output_stream_printf (stream,
+		"in vec2 %s_texcoords;\n"
+		"uniform vec2 %s_texdims;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_a;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float det = dot (vec2 (B, %s_a), vec2 (B, -C));\n"
+		"    float sqrtdet = sqrt (abs (det));\n"
+		"    vec2 t = (B + vec2 (sqrtdet, -sqrtdet)) / %s_a;\n"
+		"    \n"
+		"    vec2 is_valid = step (vec2 (0.0), t) * step (t, vec2(1.0));\n"
+		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
+		"    \n"
+		"    float upper_t = mix (t.y, t.x, is_valid.x);\n",
+		namestr, namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr, namestr);
+	} else {
+	    _cairo_output_stream_printf (stream,
+		"varying vec2 %s_texcoords;\n"
+		"uniform vec2 %s_texdims;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_a;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float det = dot (vec2 (B, %s_a), vec2 (B, -C));\n"
+		"    float sqrtdet = sqrt (abs (det));\n"
+		"    vec2 t = (B + vec2 (sqrtdet, -sqrtdet)) / %s_a;\n"
+		"    \n"
+		"    vec2 is_valid = step (vec2 (0.0), t) * step (t, vec2(1.0));\n"
+		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
+		"    \n"
+		"    float upper_t = mix (t.y, t.x, is_valid.x);\n",
+		namestr, namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr, namestr);
+	}
+
+	if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 || 
+	     ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
+	    _cairo_gl_shader_needs_border_fade (op))
+	{
+	    _cairo_output_stream_printf (stream,
+		"    float border_fade = %s_border_fade (upper_t, %s_texdims.x);\n"
+		//"    vec4 texel = texture%s%s (%s_sampler, vec2 (upper_t, 0.5));\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    if (upper_t <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (upper_t >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (upper_t - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel * border_fade, has_color);\n"
+		"}\n",
+		namestr, namestr, namestr, namestr, namestr, namestr, 
+		namestr, namestr, namestr, namestr, namestr);
+	}
+	else
+	{
+	    _cairo_output_stream_printf (stream,
+		//"    vec4 texel = texture%s%s (%s_sampler, %s_wrap (vec2(upper_t, 0.5)));\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    float upper_tw = (vec2(%s_wrap (vec2(upper_t, 0.5)))).x;\n"
+		"    if (upper_tw <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (upper_tw >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (upper_tw - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel, has_color);\n"
+		"}\n",
+		namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, namestr);
+	}
+
+	} //end of if (op->gradient.gradient->n_stops != 2) 
 	break;
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT:
+	if (op->gradient.gradient->n_stops != 2) {
 	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
 	    _cairo_output_stream_printf (stream,
 		"in vec2 %s_texcoords;\n"
@@ -982,10 +1212,119 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"    vec4 texel = texture%s%s (%s_sampler, %s_wrap (vec2(upper_t, 0.5)));\n"
 		"    return mix (vec4 (0.0), texel, has_color);\n"
 		"}\n",
+
 		namestr, rectstr, namestr, namestr, namestr, namestr,
 		namestr, namestr, namestr, namestr, namestr,
 		namestr, namestr, namestr, textstr, rectstr, namestr, namestr);
 	}
+	} else { //else of if (op->gradient.gradient->n_stops != 2)
+	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
+	    _cairo_output_stream_printf (stream,
+		"in vec2 %s_texcoords;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_a;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float det = dot (vec2 (B, %s_a), vec2 (B, -C));\n"
+		"    float sqrtdet = sqrt (abs (det));\n"
+		"    vec2 t = (B + vec2 (sqrtdet, -sqrtdet)) / %s_a;\n"
+		"    \n"
+		"    vec2 is_valid = step (vec2 (-%s_radius_0), t * %s_circle_d.z);\n"
+		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
+		"    \n"
+		"    float upper_t = mix (t.y, t.x, is_valid.x);\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    float upper_tw = (vec2(%s_wrap (vec2(upper_t, 0.5)))).x;\n"
+		"    if (upper_tw <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (upper_tw >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (upper_tw - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel, has_color);\n"
+		"}\n",
+		namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, 
+		namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, 
+		namestr, namestr, namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr);
+	} else {
+	    _cairo_output_stream_printf (stream,
+		"varying vec2 %s_texcoords;\n"
+		"uniform sampler2D%s %s_sampler;\n"
+		"uniform vec3 %s_circle_d;\n"
+		"uniform float %s_a;\n"
+		"uniform float %s_radius_0;\n"
+//two_color_mod
+#if 1
+		"uniform vec4 %s_color_1;\n"
+		"uniform vec4 %s_color_2;\n"
+		"uniform float %s_offset_1;\n"
+		"uniform float %s_offset_2;\n"
+#endif
+		"\n"
+		"vec4 get_%s()\n"
+		"{\n"
+		"    vec3 pos = vec3 (%s_texcoords, %s_radius_0);\n"
+		"    \n"
+		"    float B = dot (pos, %s_circle_d);\n"
+		"    float C = dot (pos, vec3 (pos.xy, -pos.z));\n"
+		"    \n"
+		"    float det = dot (vec2 (B, %s_a), vec2 (B, -C));\n"
+		"    float sqrtdet = sqrt (abs (det));\n"
+		"    vec2 t = (B + vec2 (sqrtdet, -sqrtdet)) / %s_a;\n"
+		"    \n"
+		"    vec2 is_valid = step (vec2 (-%s_radius_0), t * %s_circle_d.z);\n"
+		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
+		"    \n"
+		"    float upper_t = mix (t.y, t.x, is_valid.x);\n"
+//two_color_mod
+		"    vec4 texel;\n"
+		"    float scale;\n"
+		"    float factor;\n"
+		"    float upper_tw = (vec2(%s_wrap (vec2(upper_t, 0.5)))).x;\n"
+		"    if (upper_tw <= %s_offset_1) {\n"
+		"	texel = %s_color_1;\n"
+		"    } else if (upper_tw >= %s_offset_2) {\n"
+		"	texel = %s_color_2;\n"
+		"    } else {\n"
+		"	scale = %s_offset_2 - %s_offset_1;\n"
+		"	factor = (upper_tw - %s_offset_1)/scale;\n"
+		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
+		"    }\n"
+		"    return mix (vec4 (0.0), texel, has_color);\n"
+		"}\n",
+		namestr, rectstr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, namestr, 
+		namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr, 
+		namestr, namestr, namestr, namestr, namestr, namestr, namestr,
+		namestr, namestr, namestr);
+	}
+
+	} // end of if (op->gradient.gradient->n_stops != 2)
 	break;
     }
 }
@@ -1435,6 +1774,16 @@ _cairo_gl_shader_compile_and_link (cairo_gl_context_t *ctx,
 	    _cairo_gl_get_op_uniform_location (ctx, shader, i, "blur_y_axis");
 	shader->alpha_location[i] =
             _cairo_gl_get_op_uniform_location (ctx, shader, i, "alpha");
+
+//two_color_mod
+	shader->color_1_location[i] =
+            _cairo_gl_get_op_uniform_location (ctx, shader, i, "color_1");
+	shader->color_2_location[i] =
+            _cairo_gl_get_op_uniform_location (ctx, shader, i, "color_2");
+	shader->offset_1_location[i] =
+            _cairo_gl_get_op_uniform_location (ctx, shader, i, "offset_1");
+	shader->offset_2_location[i] =
+            _cairo_gl_get_op_uniform_location (ctx, shader, i, "offset_2");
     }
 
     return CAIRO_STATUS_SUCCESS;
@@ -1539,6 +1888,7 @@ _cairo_gl_shader_bind_vec4 (cairo_gl_context_t *ctx,
 			    float value2, float value3)
 {
     cairo_gl_dispatch_t *dispatch = &ctx->dispatch;
+
     assert (location != -1);
     dispatch->Uniform4f (location, value0, value1, value2, value3);
 }
