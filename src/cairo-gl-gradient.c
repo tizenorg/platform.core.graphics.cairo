@@ -233,7 +233,8 @@ cairo_int_status_t
 _cairo_gl_gradient_create (cairo_gl_context_t           *ctx,
                            unsigned int                  n_stops,
                            const cairo_gradient_stop_t  *stops,
-                           cairo_gl_gradient_t         **gradient_out)
+                           cairo_gl_gradient_t         **gradient_out,
+                           cairo_pattern_type_t		pat_type)
 {
     unsigned long hash;
     cairo_gl_gradient_t *gradient;
@@ -269,35 +270,37 @@ _cairo_gl_gradient_create (cairo_gl_context_t           *ctx,
     gradient->stops = gradient->stops_embedded;
     memcpy (gradient->stops_embedded, stops, n_stops * sizeof (cairo_gradient_stop_t));
 
-    ctx->dispatch.GenTextures (1, &gradient->tex);
-    _cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
-    ctx->dispatch.BindTexture (ctx->tex_target, gradient->tex);
+    if (pat_type != CAIRO_PATTERN_TYPE_RADIAL || n_stops != 2) {
+	ctx->dispatch.GenTextures (1, &gradient->tex);
+	_cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
+	ctx->dispatch.BindTexture (ctx->tex_target, gradient->tex);
 
-    data = _cairo_malloc_ab (tex_width, sizeof (uint32_t));
-    if (unlikely (data == NULL)) {
-	status = _cairo_error (CAIRO_STATUS_NO_MEMORY);
-	goto cleanup_gradient;
-    }
+	data = _cairo_malloc_ab (tex_width, sizeof (uint32_t));
+	if (unlikely (data == NULL)) {
+	    status = _cairo_error (CAIRO_STATUS_NO_MEMORY);
+	    goto cleanup_gradient;
+	}
 
-    status = _cairo_gl_gradient_render (ctx, n_stops, stops, data, tex_width);
-    if (unlikely (status))
-	goto cleanup_data;
+	status = _cairo_gl_gradient_render (ctx, n_stops, stops, data, tex_width);
+	if (unlikely (status))
+	    goto cleanup_data;
 
-    /*
-     * In OpenGL ES 2.0 no format conversion is allowed i.e. 'internalFormat'
-     * must match 'format' in glTexImage2D.
-     */
-    if (_cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES2 ||
-	_cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES3)
-	internal_format = GL_BGRA;
-    else
-	internal_format = GL_RGBA;
+	/*
+	 * In OpenGL ES 2.0 no format conversion is allowed i.e. 'internalFormat'
+	 * must match 'format' in glTexImage2D.
+	 */
+	if (_cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES2 ||
+	    _cairo_gl_get_flavor (&ctx->dispatch) == CAIRO_GL_FLAVOR_ES3)
+	    internal_format = GL_RGBA;
+	else
+	    internal_format = GL_RGBA;
 
-    ctx->dispatch.TexImage2D (ctx->tex_target, 0, internal_format,
+	ctx->dispatch.TexImage2D (ctx->tex_target, 0, internal_format,
 			      tex_width, 1, 0,
 			      GL_BGRA, GL_UNSIGNED_BYTE, data);
 
-    free (data);
+	free (data);
+    }
 
     /* we ignore errors here and just return an uncached gradient */
     if (unlikely (_cairo_cache_insert (&ctx->gradients, &gradient->cache_entry)))
