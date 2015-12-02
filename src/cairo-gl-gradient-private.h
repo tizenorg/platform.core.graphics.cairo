@@ -94,7 +94,8 @@ cairo_private cairo_int_status_t
 _cairo_gl_gradient_create (cairo_gl_context_t           *ctx,
                            unsigned int                  n_stops,
                            const cairo_gradient_stop_t  *stops,
-                           cairo_gl_gradient_t         **gradient_out);
+                           cairo_gl_gradient_t         **gradient_out,
+                           cairo_pattern_type_t          pat_type);
 
 cairo_private_no_warn cairo_gl_gradient_t *
 _cairo_gl_gradient_reference (cairo_gl_gradient_t *gradient);
