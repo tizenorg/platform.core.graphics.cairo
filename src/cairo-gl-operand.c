@@ -65,7 +65,7 @@ _cairo_gl_create_gradient_texture (cairo_gl_surface_t *dst,
     if (unlikely (status))
 	return status;
 
-    status = _cairo_gl_gradient_create (ctx, pattern->n_stops, pattern->stops, gradient, pattern->base.type);
+    status = _cairo_gl_gradient_create (ctx, pattern->n_stops, pattern->stops, gradient);
 
     return _cairo_gl_context_release (ctx, status);
 }
@@ -1220,6 +1220,8 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 	_cairo_gl_shader_bind_float  (ctx,
 				      ctx->current_shader->radius_0_location[tex_unit],
 				      operand->gradient.radius_0);
+        /* fall through */
+    case CAIRO_GL_OPERAND_LINEAR_GRADIENT:
 	if (operand->gradient.gradient->n_stops == 2) {
 	    _cairo_gl_shader_bind_vec4   (ctx,
 					  ctx->current_shader->color_1_location[tex_unit],
@@ -1243,7 +1245,6 @@ _cairo_gl_operand_bind_to_shader (cairo_gl_context_t *ctx,
 					 operand->gradient.gradient->stops[1].offset);
 	}
         /* fall through */
-    case CAIRO_GL_OPERAND_LINEAR_GRADIENT:
     case CAIRO_GL_OPERAND_TEXTURE:
     case CAIRO_GL_OPERAND_GAUSSIAN:
 	/*
