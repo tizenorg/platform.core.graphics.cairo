@@ -125,6 +125,9 @@ typedef struct _cairo_shader_cache_entry {
     cairo_bool_t src_use_atlas;
     cairo_bool_t mask_use_atlas;
 
+    cairo_bool_t src_n_stops_is_two;
+    cairo_bool_t mask_n_stops_is_two;
+
     cairo_gl_context_t *ctx; /* XXX: needed to destroy the program */
     cairo_gl_shader_t shader;
 } cairo_shader_cache_entry_t;
@@ -144,7 +147,9 @@ _cairo_gl_shader_cache_equal_desktop (const void *key_a, const void *key_b)
 	    a->use_coverage == b->use_coverage &&
 	    a->in   == b->in &&
 	    (both_have_npot_repeat || a->src_extend == b->src_extend) &&
-	    (both_have_npot_repeat || a->mask_extend == b->mask_extend));
+	    (both_have_npot_repeat || a->mask_extend == b->mask_extend) &&
+	    a->src_n_stops_is_two == b->src_n_stops_is_two &&
+	    a->mask_n_stops_is_two == b->mask_n_stops_is_two);
 }
 
 /*
@@ -171,13 +176,17 @@ _cairo_gl_shader_cache_equal_gles2 (const void *key_a, const void *key_b)
 	    (both_have_npot_repeat || a->src_extend == b->src_extend) &&
 	    a->mask_gl_filter == b->mask_gl_filter &&
 	    a->mask_border_fade == b->mask_border_fade &&
-	    (both_have_npot_repeat || a->mask_extend == b->mask_extend));
+	    (both_have_npot_repeat || a->mask_extend == b->mask_extend) &&
+	    a->src_n_stops_is_two == b->src_n_stops_is_two &&
+	    a->mask_n_stops_is_two == b->mask_n_stops_is_two);
 }
 
 static unsigned long
 _cairo_gl_shader_cache_hash (const cairo_shader_cache_entry_t *entry)
 {
-    return ((entry->src << 15) |
+    return ((entry->src_n_stops_is_two << 19) |
+            (entry->mask_n_stops_is_two << 18) |
+            (entry->src << 15) |
 	    (entry->mask << 12) |
 	    (entry->dest << 9) |
 	    (entry->in << 7) |
@@ -749,6 +758,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	}
         break;
     case CAIRO_GL_OPERAND_LINEAR_GRADIENT:
+	if (op->gradient.gradient->n_stops != 2) {
 	if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
 	    _cairo_output_stream_printf (stream,
 		"in vec2 %s_texcoords;\n"
@@ -788,6 +798,91 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"}\n",
 		textstr, rectstr, namestr, namestr, namestr);
 	}
+        } else { // else of if (op->gradient.gradient->n_stops != 2)
+        if (needs_glsl330 == CAIRO_GLSL_VERSION_330) {
+            _cairo_output_stream_printf (stream,
+                "in vec2 %s_texcoords;\n"
+                "uniform vec2 %s_texdims;\n"
+                "uniform sampler2D%s %s_sampler;\n"
+                "uniform vec4 %s_color_1;\n"
+                "uniform vec4 %s_color_2;\n"
+                "uniform float %s_offset_1;\n"
+                "uniform float %s_offset_2;\n"
+                "\n"
+                "vec4 get_%s()\n"
+                "{\n",
+                namestr, namestr, rectstr, namestr, namestr,
+                namestr, namestr, namestr, namestr);
+        }
+        else {
+            _cairo_output_stream_printf (stream,
+                "varying vec2 %s_texcoords;\n"
+                "uniform vec2 %s_texdims;\n"
+                "uniform sampler2D%s %s_sampler;\n"
+                "uniform vec4 %s_color_1;\n"
+                "uniform vec4 %s_color_2;\n"
+                "uniform float %s_offset_1;\n"
+                "uniform float %s_offset_2;\n"
+                "\n"
+                "vec4 get_%s()\n"
+                "{\n",
+                namestr, namestr, rectstr, namestr, namestr,
+                namestr, namestr, namestr, namestr);
+        }
+
+        if ((ctx->gl_flavor == CAIRO_GL_FLAVOR_ES2 ||
+             ctx->gl_flavor == CAIRO_GL_FLAVOR_ES3) &&
+            _cairo_gl_shader_needs_border_fade (op))
+        {
+            _cairo_output_stream_printf (stream,
+                "    float border_fade = %s_border_fade (%s_texcoords.x, %s_texdims.x);\n"
+                "    vec4 texel;\n"
+                "    float scale;\n"
+                "    float factor;\n"
+                "    float upper_t = %s_texcoords.x;\n"
+                "    if (upper_t <= %s_offset_1) {\n"
+                "       texel = %s_color_1;\n"
+                "    } else if (upper_t >= %s_offset_2) {\n"
+                "       texel = %s_color_2;\n"
+                "    } else {\n"
+                "       scale = %s_offset_2 - %s_offset_1;\n"
+                "       factor = (upper_t - %s_offset_1)/scale;\n"
+                "       texel = mix (%s_color_1, %s_color_2, factor);\n"
+                "    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
+                "    return texel * border_fade;\n"
+                "}\n",
+                namestr, namestr, namestr,
+                namestr, namestr, namestr, namestr,
+                namestr,
+                namestr, namestr, namestr, namestr, namestr);
+        }
+        else
+        {
+            _cairo_output_stream_printf (stream,
+                "    vec4 texel;\n"
+                "    float scale;\n"
+                "    float factor;\n"
+                "    float upper_t = (vec2(%s_wrap (vec2 (%s_texcoords.x, 0.5)))).x;\n"
+                "    if (upper_t <= %s_offset_1) {\n"
+                "       texel = %s_color_1;\n"
+                "    } else if (upper_t >= %s_offset_2) {\n"
+                "       texel = %s_color_2;\n"
+                "    } else {\n"
+                "       scale = %s_offset_2 - %s_offset_1;\n"
+                "       factor = (upper_t - %s_offset_1)/scale;\n"
+                "       texel = mix (%s_color_1, %s_color_2, factor);\n"
+                "    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
+                "    return texel;\n"
+                "}\n",
+                namestr, namestr, namestr, namestr, namestr, namestr,
+                namestr, namestr, namestr, namestr, namestr
+                );
+        }
+
+        } //end of if (op->gradient.gradient->n_stops != 2)
+
 	break;
     case CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0:
 	if (op->gradient.gradient->n_stops != 2) {
@@ -858,13 +953,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform sampler2D%s %s_sampler;\n"
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -885,13 +977,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform sampler2D%s %s_sampler;\n"
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -913,8 +1002,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	{
 	    _cairo_output_stream_printf (stream,
 		"    float border_fade = %s_border_fade (t, %s_texdims.x);\n"
-		//"    vec4 texel = texture%s%s (%s_sampler, vec2 (t, 0.5));\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -927,6 +1014,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (t - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel * border_fade, is_valid);\n"
 		"}\n",
 		namestr, namestr, namestr, namestr, namestr, namestr,
@@ -935,8 +1023,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	else
 	{
 	    _cairo_output_stream_printf (stream,
-		//"    vec4 texel = texture%s%s (%s_sampler, %s_wrap (vec2 (t, 0.5)));\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -950,6 +1036,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (upper_t - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel, is_valid);\n"
 		"}\n",
 		namestr, namestr, namestr, namestr, namestr,
@@ -1042,13 +1129,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_a;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -1076,13 +1160,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_a;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -1110,8 +1191,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	{
 	    _cairo_output_stream_printf (stream,
 		"    float border_fade = %s_border_fade (upper_t, %s_texdims.x);\n"
-		//"    vec4 texel = texture%s%s (%s_sampler, vec2 (upper_t, 0.5));\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -1124,6 +1203,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (upper_t - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel * border_fade, has_color);\n"
 		"}\n",
 		namestr, namestr, namestr, namestr, namestr, namestr,
@@ -1132,8 +1212,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 	else
 	{
 	    _cairo_output_stream_printf (stream,
-		//"    vec4 texel = texture%s%s (%s_sampler, %s_wrap (vec2(upper_t, 0.5)));\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -1147,6 +1225,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (upper_tw - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel, has_color);\n"
 		"}\n",
 		namestr, namestr, namestr, namestr, namestr,
@@ -1225,13 +1304,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_a;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -1248,7 +1324,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
 		"    \n"
 		"    float upper_t = mix (t.y, t.x, is_valid.x);\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -1262,6 +1337,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (upper_tw - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel, has_color);\n"
 		"}\n",
 		namestr, rectstr, namestr, namestr, namestr, namestr,
@@ -1277,13 +1353,10 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"uniform vec3 %s_circle_d;\n"
 		"uniform float %s_a;\n"
 		"uniform float %s_radius_0;\n"
-//two_color_mod
-#if 1
 		"uniform vec4 %s_color_1;\n"
 		"uniform vec4 %s_color_2;\n"
 		"uniform float %s_offset_1;\n"
 		"uniform float %s_offset_2;\n"
-#endif
 		"\n"
 		"vec4 get_%s()\n"
 		"{\n"
@@ -1300,7 +1373,6 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"    float has_color = step (0., det) * max (is_valid.x, is_valid.y);\n"
 		"    \n"
 		"    float upper_t = mix (t.y, t.x, is_valid.x);\n"
-//two_color_mod
 		"    vec4 texel;\n"
 		"    float scale;\n"
 		"    float factor;\n"
@@ -1314,6 +1386,7 @@ cairo_gl_shader_emit_color (cairo_output_stream_t *stream,
 		"	factor = (upper_tw - %s_offset_1)/scale;\n"
 		"	texel = mix (%s_color_1, %s_color_2, factor);\n"
 		"    }\n"
+                "    texel = vec4(texel.rgb * texel.a, texel.a);\n"
 		"    return mix (vec4 (0.0), texel, has_color);\n"
 		"}\n",
 		namestr, rectstr, namestr, namestr, namestr, namestr,
@@ -1456,7 +1529,12 @@ _cairo_gl_shader_emit_wrap (cairo_gl_context_t *ctx,
 	}
     }
     else {
-	if (! ctx->has_npot_repeat &&
+        if (((! ctx->has_npot_repeat) ||
+                ((operand->type == CAIRO_GL_OPERAND_LINEAR_GRADIENT ||
+                  operand->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0 ||
+                  operand->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE ||
+                  operand->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT) &&
+                 operand->gradient.gradient->n_stops == 2)) &&
 	    (extend == CAIRO_EXTEND_REPEAT ||
 	     extend == CAIRO_EXTEND_REFLECT)) {
 	    if (extend == CAIRO_EXTEND_REPEAT) {
@@ -1775,7 +1853,6 @@ _cairo_gl_shader_compile_and_link (cairo_gl_context_t *ctx,
 	shader->alpha_location[i] =
             _cairo_gl_get_op_uniform_location (ctx, shader, i, "alpha");
 
-//two_color_mod
 	shader->color_1_location[i] =
             _cairo_gl_get_op_uniform_location (ctx, shader, i, "color_1");
 	shader->color_2_location[i] =
@@ -1954,6 +2031,22 @@ _cairo_gl_get_shader_by_type (cairo_gl_context_t *ctx,
 					    _cairo_gl_operand_get_use_atlas (mask),
 					    use_coverage,
 					    CAIRO_GL_VAR_NONE);
+
+    if (source->type == CAIRO_GL_OPERAND_LINEAR_GRADIENT ||
+        source->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0 ||
+        source->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE ||
+        source->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT)
+        lookup.src_n_stops_is_two = source->gradient.gradient->n_stops == 2;
+    else
+        lookup.src_n_stops_is_two = FALSE;
+
+    if (mask->type == CAIRO_GL_OPERAND_LINEAR_GRADIENT ||
+        mask->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_A0 ||
+        mask->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_NONE ||
+        mask->type == CAIRO_GL_OPERAND_RADIAL_GRADIENT_EXT)
+        lookup.mask_n_stops_is_two = mask->gradient.gradient->n_stops == 2;
+    else
+        lookup.mask_n_stops_is_two = FALSE;
 
     lookup.src = source->type;
     lookup.mask = mask->type;

@@ -233,8 +233,7 @@ cairo_int_status_t
 _cairo_gl_gradient_create (cairo_gl_context_t           *ctx,
                            unsigned int                  n_stops,
                            const cairo_gradient_stop_t  *stops,
-                           cairo_gl_gradient_t         **gradient_out,
-                           cairo_pattern_type_t          pat_type)
+                           cairo_gl_gradient_t         **gradient_out)
 {
     unsigned long hash;
     cairo_gl_gradient_t *gradient;
@@ -270,7 +269,7 @@ _cairo_gl_gradient_create (cairo_gl_context_t           *ctx,
     gradient->stops = gradient->stops_embedded;
     memcpy (gradient->stops_embedded, stops, n_stops * sizeof (cairo_gradient_stop_t));
 
-    if (pat_type != CAIRO_PATTERN_TYPE_RADIAL || n_stops != 2) {
+    if (n_stops != 2) {
 	ctx->dispatch.GenTextures (1, &gradient->tex);
 	_cairo_gl_context_activate (ctx, CAIRO_GL_TEX_TEMP);
 	ctx->dispatch.BindTexture (ctx->tex_target, gradient->tex);
