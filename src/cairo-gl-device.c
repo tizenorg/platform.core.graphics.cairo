@@ -1100,11 +1100,24 @@ void
 cairo_gl_device_set_thread_aware (cairo_device_t	*device,
 				  cairo_bool_t		 thread_aware)
 {
+    if ((! device)||(cairo_device_status(device)!= CAIRO_STATUS_SUCCESS)) {
+	fprintf (stderr, "cairo_gl_device_set_thread_aware(): cairo_device is NULL or not available\n");
+	_cairo_error_throw (CAIRO_STATUS_DEVICE_ERROR);
+	return;
+    }
     if (device->backend->type != CAIRO_DEVICE_TYPE_GL) {
 	_cairo_error_throw (CAIRO_STATUS_DEVICE_TYPE_MISMATCH);
 	return;
     }
-    ((cairo_gl_context_t *) device)->thread_aware = thread_aware;
+    if(thread_aware == 0 || thread_aware == 1)
+    {
+	((cairo_gl_context_t *) device)->thread_aware = thread_aware;
+    }
+    else
+    {
+	_cairo_device_set_error (device, CAIRO_STATUS_INVALID_STATUS);
+	return;
+    }
 }
 
 void _cairo_gl_context_reset (cairo_gl_context_t *ctx)
