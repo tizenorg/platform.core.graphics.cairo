@@ -153,11 +153,11 @@ NOCONFIGURE=1 ./autogen.sh
     --enable-glesv2=yes \
     --enable-evasgl=yes \
 %endif
-    --enable-ps \
-    --enable-pdf \
-    --enable-script \
-    --enable-svg \
-    --enable-tee \
+    --enable-ps=no \
+    --enable-pdf=no \
+    --enable-script=no \
+    --enable-svg=no \
+    --enable-tee=no \
 %if %{with wayland} && !%{with x}
    --disable-xlib \
    --disable-xcb  \
