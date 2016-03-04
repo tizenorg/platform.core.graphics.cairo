@@ -138,7 +138,7 @@ NOCONFIGURE=1 ./autogen.sh
     --enable-evasgl=yes \
 %endif
     --enable-ps=no \
-    --enable-pdf=no \
+    --enable-pdf=yes \
     --enable-script=no \
     --enable-svg=no \
     --enable-tee=no \
