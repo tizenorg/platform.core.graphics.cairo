@@ -141,7 +141,7 @@ NOCONFIGURE=1 ./autogen.sh
     --enable-pdf=yes \
     --enable-script=yes \
     --enable-svg=yes \
-    --enable-tee=yes \
+    --enable-tee=no \
 %if %{with wayland} && !%{with x}
    --disable-xlib \
    --disable-xcb  \
