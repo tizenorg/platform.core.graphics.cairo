@@ -139,7 +139,7 @@ NOCONFIGURE=1 ./autogen.sh
 %endif
     --enable-ps=yes \
     --enable-pdf=yes \
-    --enable-script=no \
+    --enable-script=yes \
     --enable-svg=yes \
     --enable-tee=no \
 %if %{with wayland} && !%{with x}
