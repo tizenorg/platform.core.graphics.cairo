@@ -833,6 +833,8 @@ _stroke_shaper_add_quad (void			*closure,
 						      quad);
 }
 
+/*
+ # to avoid warning : defined but not used [-Wunused-function]
 static cairo_bool_t
 _is_continuous_arc (const cairo_path_fixed_t   *path,
 		    const cairo_stroke_style_t *style)
@@ -840,6 +842,7 @@ _is_continuous_arc (const cairo_path_fixed_t   *path,
     return (_cairo_path_fixed_is_single_arc (path) &&
 	    style->dash == NULL);
 }
+*/
 
 static cairo_int_status_t
 _prevent_overlapping_strokes (cairo_gl_context_t 		*ctx,

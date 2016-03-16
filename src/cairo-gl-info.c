@@ -124,11 +124,11 @@ _cairo_gl_has_extension (cairo_gl_dispatch_t *dispatch, const char *ext)
 {
     int version = _cairo_gl_get_version (dispatch);
     if (version >= CAIRO_GL_VERSION_ENCODE (3, 0)) {
-	GLuint max_num_extensions;
+	GLint max_num_extensions;
 	int i;
 	dispatch->GetIntegerv (GL_NUM_EXTENSIONS, &max_num_extensions);
 
-	for (i = 0; i < max_num_extensions; i++) {
+	for (i = 0; i < (int)max_num_extensions; i++) {
 	    const char *extension = (const char *) dispatch->GetStringi (GL_EXTENSIONS, i);
 	    if (strstr (extension, ext) == 0)
 		return TRUE;

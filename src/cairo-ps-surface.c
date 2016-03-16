@@ -1907,7 +1907,7 @@ _cairo_ps_surface_create_padded_image_from_image (cairo_ps_surface_t           *
 	if (pad_image->status) {
 	    status = pad_image->status;
 	    cairo_surface_destroy (pad_image);
-	    status;
+	    //status;
 	}
 
 	_cairo_pattern_init_for_surface (&pad_pattern, &source->base);

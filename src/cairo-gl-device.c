@@ -507,7 +507,7 @@ _cairo_gl_context_activate (cairo_gl_context_t *ctx,
             _cairo_gl_composite_flush (ctx);
             _cairo_gl_context_destroy_operand (ctx, ctx->max_textures - 1);
         }
-        if (ctx->states_cache.active_texture != ctx->max_textures - 1) {
+        if (ctx->states_cache.active_texture != (GLenum)(ctx->max_textures - 1)) {
 	    ctx->dispatch.ActiveTexture (ctx->max_textures - 1);
 	    ctx->states_cache.active_texture = ctx->max_textures - 1;
         }
@@ -850,8 +850,8 @@ bind_multisample_framebuffer (cairo_gl_context_t *ctx,
 			       cairo_gl_surface_t *surface)
 {
 #if CAIRO_HAS_GL_SURFACE || CAIRO_HAS_EVASGL_SURFACE
-    cairo_bool_t stencil_test_enabled, scissor_test_enabled;
-    cairo_bool_t has_stencil_cache;
+    cairo_bool_t stencil_test_enabled = FALSE, scissor_test_enabled = FALSE;
+    cairo_bool_t has_stencil_cache = FALSE;
     GLbitfield mask;
 
     if (ctx->gl_flavor == CAIRO_GL_FLAVOR_DESKTOP) {
@@ -1115,7 +1115,8 @@ cairo_gl_device_set_thread_aware (cairo_device_t	*device,
     }
     else
     {
-	_cairo_device_set_error (device, CAIRO_STATUS_INVALID_STATUS);
+		cairo_status_t ret;
+		ret = _cairo_device_set_error (device, CAIRO_STATUS_INVALID_STATUS);
 	return;
     }
 }

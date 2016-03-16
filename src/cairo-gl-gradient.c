@@ -83,6 +83,8 @@ _cairo_gl_gradient_sample_width (unsigned int                 n_stops,
     return (width + 7) & -8;
 }
 
+/*
+ # to avoid warning : defined but not used [-Wunused-function]
 static uint8_t premultiply(double c, double a)
 {
     int v = c * a * 256;
@@ -103,6 +105,7 @@ static uint32_t color_stop_to_pixel(const cairo_gradient_stop_t *stop)
     else
 	return a << 0 | r << 8 | g << 16 | b << 24;
 }
+*/
 
 static cairo_status_t
 _cairo_gl_gradient_render (const cairo_gl_context_t    *ctx,

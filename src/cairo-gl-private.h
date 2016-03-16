@@ -857,7 +857,7 @@ _cairo_gl_ensure_drawbuffers (cairo_gl_context_t *ctx)
     if ((ctx->vao != 0 && 
 	 (ctx->vao != ctx->states_cache.bound_vao))) {
 	ctx->dispatch.GetIntegerv (GL_VERTEX_ARRAY_BINDING, &vao);
-	if (vao != ctx->states_cache.bound_vao) {
+	if (vao != (GLint)ctx->states_cache.bound_vao) {
 	    ctx->dispatch.BindVertexArray (ctx->vao);
 	    ctx->states_cache.bound_vao = ctx->vao;
 
@@ -872,7 +872,7 @@ _cairo_gl_ensure_drawbuffers (cairo_gl_context_t *ctx)
     if ((ctx->vbo != 0 &&
 	 (ctx->vbo != ctx->states_cache.bound_vbo))) {
 	ctx->dispatch.GetIntegerv (GL_ARRAY_BUFFER_BINDING, &vbo);
-	if (vbo != (GLint) ctx->states_cache.bound_vbo) { 
+	if (vbo != (GLint)ctx->states_cache.bound_vbo) {
 	    ctx->dispatch.BindBuffer (GL_ARRAY_BUFFER, ctx->vbo);
 	}
 	ctx->states_cache.bound_vbo = ctx->vbo;
@@ -881,7 +881,7 @@ _cairo_gl_ensure_drawbuffers (cairo_gl_context_t *ctx)
     if ((ctx->ibo != 0 &&
 	 (ctx->ibo != ctx->states_cache.bound_ibo))) {
 	ctx->dispatch.GetIntegerv (GL_ELEMENT_ARRAY_BUFFER_BINDING, &ibo);
-	if (ibo != (GLint) ctx->states_cache.bound_ibo) { 
+	if (ibo != (GLint)ctx->states_cache.bound_ibo) {
 	    ctx->dispatch.BindBuffer (GL_ELEMENT_ARRAY_BUFFER, ctx->ibo);
 	}
 	ctx->states_cache.bound_ibo = ctx->ibo;

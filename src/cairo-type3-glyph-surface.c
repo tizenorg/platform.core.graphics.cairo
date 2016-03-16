@@ -431,7 +431,8 @@ _cairo_type3_glyph_surface_analyze_glyph (void		     *abstract_surface,
     null_stream = _cairo_null_stream_create ();
     if (unlikely (null_stream->status)) {
 	status = null_stream->status;
-	_cairo_output_stream_destroy (null_stream);
+	cairo_status_t ret;
+	ret = _cairo_output_stream_destroy (null_stream);
 	return status;
     }
 
@@ -538,7 +539,8 @@ _cairo_type3_glyph_surface_emit_glyph (void		     *abstract_surface,
 	mem_stream = _cairo_memory_stream_create ();
 	status = mem_stream->status;
 	if (unlikely (status)) {
-	     _cairo_output_stream_destroy (mem_stream);
+		cairo_status_t ret;
+		ret = _cairo_output_stream_destroy (mem_stream);
 	    goto FAIL;
 	}
 

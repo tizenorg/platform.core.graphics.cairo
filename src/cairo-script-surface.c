@@ -3778,7 +3778,8 @@ cairo_script_create (const char *filename)
 
     stream = _cairo_output_stream_create_for_filename (filename);
     if ((status = _cairo_output_stream_get_status (stream))) {
-	_cairo_output_stream_destroy (stream);
+		cairo_status_t ret;
+		ret = _cairo_output_stream_destroy (stream);
 	return _cairo_device_create_in_error (status);
     }
 
@@ -3812,7 +3813,8 @@ cairo_script_create_for_stream (cairo_write_func_t	 write_func,
 
     stream = _cairo_output_stream_create (write_func, NULL, closure);
     if ((status = _cairo_output_stream_get_status (stream))) {
-	_cairo_output_stream_destroy (stream);
+		cairo_status_t ret;
+		ret = _cairo_output_stream_destroy (stream);
 	return _cairo_device_create_in_error (status);
     }
 

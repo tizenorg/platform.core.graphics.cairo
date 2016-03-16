@@ -240,7 +240,7 @@ _cairo_array_copy_element (const cairo_array_t *array,
 			   unsigned int         index,
 			   void                *dst)
 {
-    void *src = _cairo_array_index_const (array, index);
+    void *src = (void *)_cairo_array_index_const (array, index);
     if(src != NULL)
 	memcpy (dst, src, array->element_size);
 }

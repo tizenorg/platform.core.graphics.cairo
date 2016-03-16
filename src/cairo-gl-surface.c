@@ -1441,11 +1441,14 @@ FAIL:
     return status;
 }
 
+/*
+ # to avoid warning : defined but not used [-Wunused-function]
 static int _cairo_gl_surface_flavor (cairo_gl_surface_t *surface)
 {
     cairo_gl_context_t *ctx = (cairo_gl_context_t *)surface->base.device;
     return ctx->gl_flavor;
 }
+*/
 
 static cairo_status_t
 _cairo_gl_surface_finish (void *abstract_surface)

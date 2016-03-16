@@ -194,6 +194,8 @@ floored_divrem (int a, int b)
     return qr;
 }
 
+/*
+ # to avoid warning : defined but not used [-Wunused-function]
 static struct quorem
 floored_muldivrem(int x, int a, int b)
 {
@@ -207,6 +209,7 @@ floored_muldivrem(int x, int a, int b)
     }
     return qr;
 }
+*/
 
 static cairo_fixed_t
 line_compute_intersection_x_for_y (const cairo_line_t *line,
@@ -2045,6 +2048,8 @@ _cairo_botor_scan_converter_generate (void			*converter,
     return status;
 }
 
+/*
+# to avoid warning : defined but not used [-Wunused-function]
 static edge_t *
 botor_allocate_edge (cairo_botor_scan_converter_t *self)
 {
@@ -2127,6 +2132,7 @@ botor_add_edge (cairo_botor_scan_converter_t *self,
 
     return CAIRO_STATUS_SUCCESS;
 }
+*/
 
 static void
 _cairo_botor_scan_converter_destroy (void *converter)

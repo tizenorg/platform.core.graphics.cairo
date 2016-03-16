@@ -90,6 +90,8 @@ typedef struct cairo_stroker {
     cairo_box_t bounds;
 } cairo_stroker_t;
 
+/*
+ # to avoid warning : defined but not used [-Wunused-function]
 static cairo_bool_t
 _cairo_stroke_segment_intersect (cairo_point_t *p1, cairo_point_t *p2,
                  cairo_point_t *p3, cairo_point_t *p4,
@@ -117,7 +119,7 @@ _cairo_stroke_segment_intersect (cairo_point_t *p1, cairo_point_t *p2,
     x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
     y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
 
-    /* check if x, y are within both segments */
+    // check if x, y are within both segments
     if (x < MIN (x1, x2) || x > MAX (x1, x2) ||
         x < MIN (x3, x4) || x > MAX (x3, x4))
     return FALSE;
@@ -129,6 +131,7 @@ _cairo_stroke_segment_intersect (cairo_point_t *p1, cairo_point_t *p2,
     p->y = _cairo_fixed_from_double (y);
     return TRUE;
 }
+*/
 
 static void
 _cairo_stroker_limit (cairo_stroker_t *stroker,

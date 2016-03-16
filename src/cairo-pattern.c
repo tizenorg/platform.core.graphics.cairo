@@ -297,7 +297,7 @@ _cairo_mesh_pattern_init_copy (cairo_mesh_pattern_t       *pattern,
     *pattern = *other;
 
     _cairo_array_init (&pattern->patches,  sizeof (cairo_mesh_patch_t));
-    data = _cairo_array_index_const (&other->patches, 0);
+    data = (void *)_cairo_array_index_const (&other->patches, 0);
     if (data == NULL)
 	return CAIRO_STATUS_NULL_POINTER;
     return _cairo_array_append_multiple (&pattern->patches,
