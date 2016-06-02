@@ -1235,7 +1235,6 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 	}
 	break;
     // color font
-    #if 0 // TODO(suyambu.rm) Build error for Tizen 3.0
     case FT_PIXEL_MODE_BGRA:
 	stride = bitmap->pitch;
 
@@ -1252,7 +1251,6 @@ _get_bitmap_surface (FT_Bitmap		     *bitmap,
 	format = CAIRO_FORMAT_ARGB32;
 	component_alpha = FALSE;
         break;
-    #endif
     case FT_PIXEL_MODE_GRAY2:
     case FT_PIXEL_MODE_GRAY4:
     convert:
