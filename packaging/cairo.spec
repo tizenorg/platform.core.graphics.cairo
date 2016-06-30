@@ -27,6 +27,7 @@ BuildRequires:  pkgconfig(pixman-1)
 BuildRequires:  which
 BuildRequires:	pkgconfig(ecore)
 BuildRequires:	pkgconfig(evas)
+BuildRequires:  pkgconfig(ttrace)
 %if %{with cairo_gl_backend}
 %if %{with x} && %{with desktop}
 BuildRequires:  pkgconfig(gl)
@@ -142,6 +143,7 @@ NOCONFIGURE=1 ./autogen.sh
     --enable-script=yes \
     --enable-svg=yes \
     --enable-tee=no \
+    --enable-ttrace=no \
 %if %{with wayland} && !%{with x}
    --disable-xlib \
    --disable-xcb  \

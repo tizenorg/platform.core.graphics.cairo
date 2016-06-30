@@ -410,6 +410,7 @@ AC_DEFUN([CAIRO_REPORT],
 	echo ""
 	echo "The following features and utilities:"
 	echo "  cairo-trace:                $use_trace"
+	echo "  cairo-ttrace:               $use_ttrace"
 	echo "  cairo-script-interpreter:   $use_interpreter"
 	echo ""
 	echo "And the following internal features:"

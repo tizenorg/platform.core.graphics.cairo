@@ -51,6 +51,7 @@
 #include "cairo-clip-private.h"
 #include "cairo-error-private.h"
 #include "cairo-image-surface-private.h"
+#include "cairo-ttrace.h"
 
 cairo_int_status_t
 _cairo_gl_composite_set_source (cairo_gl_composite_t *setup,
@@ -76,7 +77,7 @@ _cairo_gl_composite_set_source_operand (cairo_gl_composite_t *setup,
     _cairo_gl_operand_copy (&setup->src, source);
     if (source->type == CAIRO_GL_OPERAND_TEXTURE ||
 	source->type == CAIRO_GL_OPERAND_GAUSSIAN)
-	status = _cairo_gl_surface_resolve_multisampling (source->texture.surface);	
+	status = _cairo_gl_surface_resolve_multisampling (source->texture.surface);
 }
 
 void
@@ -112,7 +113,7 @@ _cairo_gl_composite_set_mask_operand (cairo_gl_composite_t *setup,
 	_cairo_gl_operand_copy (&setup->mask, mask);
 	if (mask->type == CAIRO_GL_OPERAND_TEXTURE ||
 	    mask->type == CAIRO_GL_OPERAND_GAUSSIAN)
-	    status = _cairo_gl_surface_resolve_multisampling (mask->texture.surface);	
+	    status = _cairo_gl_surface_resolve_multisampling (mask->texture.surface);
     }
 }
 
@@ -830,14 +831,17 @@ cairo_status_t
 _cairo_gl_composite_begin (cairo_gl_composite_t *setup,
 			   cairo_gl_context_t **ctx_out)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     cairo_gl_context_t *ctx;
     cairo_status_t status;
 
     assert (setup->dst);
 
     status = _cairo_gl_context_acquire (setup->dst->base.device, &ctx);
-    if (unlikely (status))
-	return status;
+    if (unlikely (status)) {
+		CAIRO_TRACE_END (__func__);
+		return status;
+    }
 
     setup->dst->content_cleared = FALSE;
 
@@ -862,12 +866,14 @@ FAIL:
     if (unlikely (status))
         status = _cairo_gl_context_release (ctx, status);
 
+    CAIRO_TRACE_END (__func__);
     return status;
 }
 
 static inline void
 _cairo_gl_composite_draw_tristrip (cairo_gl_context_t *ctx)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     cairo_array_t* indices = &ctx->tristrip_indices;
     const unsigned short *indices_array = _cairo_array_index_const (indices, 0);
 
@@ -890,11 +896,13 @@ _cairo_gl_composite_draw_tristrip (cairo_gl_context_t *ctx)
 
     ctx->dispatch.DrawElements (GL_TRIANGLE_STRIP, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, ctx->ibo ? 0 :indices_array);
     _cairo_array_truncate (indices, 0);
+    CAIRO_TRACE_END (__func__);
 }
 
 static inline void
 _cairo_gl_composite_draw_line (cairo_gl_context_t *ctx)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     GLenum type = GL_LINE_STRIP;
     cairo_array_t* indices = &ctx->tristrip_indices;
     const unsigned short *indices_array = _cairo_array_index_const (indices, 0);
@@ -921,12 +929,14 @@ _cairo_gl_composite_draw_line (cairo_gl_context_t *ctx)
 
     ctx->dispatch.DrawElements (type, _cairo_array_num_elements (indices), GL_UNSIGNED_SHORT, ctx->ibo ? 0 : indices_array);
     _cairo_array_truncate (indices, 0);
+    CAIRO_TRACE_END (__func__);
 }
 
 static inline void
 _cairo_gl_composite_draw_triangles (cairo_gl_context_t *ctx,
 				    unsigned int count)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     if (! ctx->pre_shader) {
         ctx->dispatch.DrawArrays (GL_TRIANGLES, 0, count);
     } else {
@@ -940,17 +950,20 @@ _cairo_gl_composite_draw_triangles (cairo_gl_context_t *ctx,
         _cairo_gl_set_operator (ctx, CAIRO_OPERATOR_ADD, TRUE);
         ctx->dispatch.DrawArrays (GL_TRIANGLES, 0, count);
     }
+    CAIRO_TRACE_END (__func__);
 }
 
 static void
 _cairo_gl_composite_draw_triangles_with_clip_region (cairo_gl_context_t *ctx,
 						     unsigned int count)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     int i, num_rectangles;
 
     if (!ctx->clip_region) {
-	_cairo_gl_composite_draw_triangles (ctx, count);
-	return;
+		_cairo_gl_composite_draw_triangles (ctx, count);
+        CAIRO_TRACE_END (__func__);
+		return;
     }
 
     num_rectangles = cairo_region_num_rectangles (ctx->clip_region);
@@ -963,6 +976,7 @@ _cairo_gl_composite_draw_triangles_with_clip_region (cairo_gl_context_t *ctx,
 	_enable_scissor_buffer (ctx);
 	_cairo_gl_composite_draw_triangles (ctx, count);
     }
+    CAIRO_TRACE_END (__func__);
 }
 
 static void
@@ -979,14 +993,14 @@ _cairo_gl_composite_unmap_vertex_buffer (cairo_gl_context_t *ctx)
 void
 _cairo_gl_composite_flush (cairo_gl_context_t *ctx)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     unsigned int count;
     int i;
 
-    if (_cairo_gl_context_is_flushed (ctx))
+    if (_cairo_gl_context_is_flushed (ctx)) {
+		CAIRO_TRACE_END (__func__);
         return;
-
-    /* ensure we are binding to vbo and ibo */
-    _cairo_gl_ensure_drawbuffers (ctx);
+    }
 
     count = ctx->vb_offset / ctx->vertex_size;
 
@@ -1007,6 +1021,7 @@ _cairo_gl_composite_flush (cairo_gl_context_t *ctx)
 	_cairo_gl_glyph_cache_unlock (&ctx->glyph_cache[i]);
 
     _cairo_gl_image_cache_unlock (ctx);
+    CAIRO_TRACE_END (__func__);
 }
 
 static void
@@ -1482,18 +1497,22 @@ _cairo_gl_composite_init (cairo_gl_composite_t *setup,
                           cairo_gl_surface_t *dst,
                           cairo_bool_t assume_component_alpha)
 {
+    CAIRO_TRACE_BEGIN (__func__);
     cairo_status_t status;
 
     memset (setup, 0, sizeof (cairo_gl_composite_t));
 
     status = _cairo_gl_composite_set_operator (setup, op,
 					       assume_component_alpha);
-    if (status)
-	return status;
+    if (status) {
+        CAIRO_TRACE_END (__func__);
+		return status;
+    }
 
     setup->dst = dst;
     setup->clip_region = dst->clip_region;
 
+    CAIRO_TRACE_END (__func__);
     return CAIRO_STATUS_SUCCESS;
 }
 
