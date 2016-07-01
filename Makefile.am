@@ -18,12 +18,11 @@ ACLOCAL_AMFLAGS = -I build ${ACLOCAL_FLAGS}
 
 #DIST_SUBDIRS = src doc util boilerplate test perf
 #SUBDIRS = src doc util
-DIST_SUBDIRS = src util boilerplate
+DIST_SUBDIRS = src util
 SUBDIRS = src util
 # libpng is required for our test programs
 if CAIRO_HAS_PNG_FUNCTIONS
 #SUBDIRS += boilerplate test perf
-SUBDIRS += boilerplate
 endif
 
 configure: cairo-version.h

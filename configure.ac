@@ -932,7 +932,6 @@ AM_CONDITIONAL(HAVE_GTK, test "x$have_gtk" = "xyes")
 
 AC_CONFIG_FILES([
 Makefile
-boilerplate/Makefile
 src/Makefile
 util/Makefile
 util/cairo-gobject/Makefile

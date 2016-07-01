@@ -21,7 +21,6 @@ else
 fi
 
 # create dummy */Makefile.am.features and ChangeLog to make automake happy
-> boilerplate/Makefile.am.features
 > src/Makefile.am.features
 touch ChangeLog
 

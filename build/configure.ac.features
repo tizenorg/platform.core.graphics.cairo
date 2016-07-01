@@ -53,12 +53,11 @@ dnl ===========================================================================
 
 dnl ===========================================================================
 dnl
-dnl Generate {src,boilerplate}/Makefile.{am,win32}.config
+dnl Generate {src}/Makefile.{am,win32}.config
 dnl
 
 CAIRO_INIT_MAKEFILES([build])
 CAIRO_CONFIG_MAKEFILE([cairo], [src])dnl
-CAIRO_CONFIG_MAKEFILE([cairo_boilerplate], [boilerplate])dnl
 CAIRO_MAKEFILE_INCLUDE(*,[Makefile.sources])dnl
 dnl An empty line per feature for readability
 CAIRO_MAKEFILE_ACCUMULATE_FEATURE(*,*,*,*,[])dnl
